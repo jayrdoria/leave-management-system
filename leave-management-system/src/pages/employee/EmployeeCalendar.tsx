@@ -1,0 +1,198 @@
+import { useState, useEffect } from "react";
+import FullCalendar from "@fullcalendar/react";
+import dayGridPlugin from "@fullcalendar/daygrid";
+import interactionPlugin, { DateClickArg } from "@fullcalendar/interaction";
+import { EventClickArg } from "@fullcalendar/core";
+import { Dialog } from "@headlessui/react";
+import axios from "axios";
+import LeaveForm from "./LeaveForm";
+
+interface LeaveEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+}
+
+interface LeaveDetails {
+  _id: string;
+  type: string;
+  category: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  reason?: string;
+  createdAt: string;
+  user?: {
+    name: string;
+  };
+}
+
+const EmployeeCalendar = () => {
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [isOpen, setIsOpen] = useState(false);
+  const [events, setEvents] = useState<LeaveEvent[]>([]);
+  const [viewDetails, setViewDetails] = useState<LeaveDetails | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+
+  const fetchEvents = async () => {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    if (!user?.id) return;
+    try {
+      const res = await axios.get(
+        `http://localhost:5050/api/leave/mine/${user.id}`
+      );
+      const formatted = res.data.map((item: any) => {
+        const start = new Date(item.startDate).toISOString().split("T")[0];
+        const end = new Date(new Date(item.endDate).getTime() + 86400000)
+          .toISOString()
+          .split("T")[0];
+        return {
+          id: item._id,
+          title: `${item.type} – ${user.name || "Me"}`,
+          start,
+          end,
+          allDay: true,
+        };
+      });
+      setEvents(formatted);
+    } catch (err) {
+      console.error("Error loading events");
+    }
+  };
+
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  const handleDateClick = (arg: DateClickArg) => {
+    setSelectedDate(new Date(arg.dateStr));
+    setIsOpen(true);
+  };
+
+  const handleEventClick = async (arg: EventClickArg) => {
+    const id = arg.event.id;
+    try {
+      const res = await axios.get(`http://localhost:5050/api/leave/one/${id}`);
+      setViewDetails(res.data);
+      setShowDetails(true);
+    } catch (err) {
+      console.error("Failed to load leave details");
+    }
+  };
+
+  const cancelLeave = async () => {
+    if (!viewDetails?._id) return;
+    try {
+      await axios.delete(`http://localhost:5050/api/leave/${viewDetails._id}`);
+      setShowDetails(false);
+      fetchEvents();
+    } catch (err) {
+      console.error("Failed to cancel leave");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="bg-white rounded-lg shadow p-4 max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
+          My Leave Calendar
+        </h1>
+        <div className="cursor-pointer">
+          <FullCalendar
+            plugins={[dayGridPlugin, interactionPlugin]}
+            initialView="dayGridMonth"
+            dateClick={handleDateClick}
+            eventClick={handleEventClick}
+            events={events}
+            height="auto"
+          />
+        </div>
+      </div>
+
+      <Dialog
+        open={isOpen}
+        onClose={() => setIsOpen(false)}
+        className="relative z-50"
+      >
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="mx-auto max-w-lg w-full rounded bg-white p-6 shadow-xl">
+            <Dialog.Title className="text-xl font-bold mb-4">
+              Apply for Leave — {selectedDate?.toDateString()}
+            </Dialog.Title>
+            <LeaveForm
+              selectedDate={selectedDate}
+              closeModal={() => setIsOpen(false)}
+              onSuccess={fetchEvents}
+            />
+          </Dialog.Panel>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={showDetails}
+        onClose={() => setShowDetails(false)}
+        className="relative z-50"
+      >
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="mx-auto max-w-md w-full rounded bg-white p-6 shadow-xl">
+            <Dialog.Title className="text-lg font-bold mb-4 text-gray-800">
+              Leave Details
+            </Dialog.Title>
+            {viewDetails && (
+              <div className="space-y-2 text-sm text-gray-700">
+                <p>
+                  <span className="font-semibold">Type:</span>{" "}
+                  {viewDetails.type}
+                </p>
+                <p>
+                  <span className="font-semibold">Category:</span>{" "}
+                  {viewDetails.category}
+                </p>
+                <p>
+                  <span className="font-semibold">Start:</span>{" "}
+                  {new Date(viewDetails.startDate).toLocaleDateString()}
+                </p>
+                <p>
+                  <span className="font-semibold">End:</span>{" "}
+                  {new Date(viewDetails.endDate).toLocaleDateString()}
+                </p>
+                <p>
+                  <span className="font-semibold">Status:</span>{" "}
+                  {viewDetails.status}
+                </p>
+                {viewDetails.reason && (
+                  <p>
+                    <span className="font-semibold">Reason:</span>{" "}
+                    {viewDetails.reason}
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              {viewDetails?.status === "Pending" && (
+                <button
+                  onClick={cancelLeave}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                >
+                  Cancel Leave
+                </button>
+              )}
+              <button
+                onClick={() => setShowDetails(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm"
+              >
+                Close
+              </button>
+            </div>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
+    </div>
+  );
+};
+
+export default EmployeeCalendar;
