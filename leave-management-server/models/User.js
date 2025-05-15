@@ -11,6 +11,10 @@ const userSchema = new mongoose.Schema(
       default: "employee",
     },
     department: { type: String },
+    departmentScope: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true }
 );

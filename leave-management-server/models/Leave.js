@@ -33,6 +33,9 @@ const leaveSchema = new mongoose.Schema(
     },
     approverId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     comment: { type: String },
+
+    // ✅ Added this for manager filtering
+    department: { type: String },
   },
   { timestamps: true }
 );

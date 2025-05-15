@@ -3,6 +3,8 @@ import Login from "./pages/Login";
 import LeaveForm from "./pages/employee/LeaveForm";
 import EmployeeCalendar from "./pages/employee/EmployeeCalendar";
 import LeaveHistory from "./pages/employee/LeaveHistory";
+import ManageLeaves from "./pages/manager/ManageLeaves";
+import ManagerCalendar from "./pages/manager/ManagerCalendar";
 
 function App() {
   return (
@@ -16,6 +18,9 @@ function App() {
         <Route path="/employee/leave" element={<LeaveForm />} />
         <Route path="/employee/calendar" element={<EmployeeCalendar />} />
         <Route path="/employee/history" element={<LeaveHistory />} />
+        <Route path="/manager/history" element={<LeaveHistory />} />
+        <Route path="/manager/leaves" element={<ManageLeaves />} />
+        <Route path="/manager/calendar" element={<ManagerCalendar />} />
       </Routes>
     </BrowserRouter>
   );

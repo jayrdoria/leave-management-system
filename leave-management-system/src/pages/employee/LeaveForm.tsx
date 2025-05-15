@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import toast from "react-hot-toast";
 
 interface LeaveFormProps {
   selectedDate?: Date;
@@ -53,6 +54,8 @@ const LeaveForm: React.FC<LeaveFormProps> = ({
         deductCredits,
       });
 
+      toast.success("Leave submitted successfully!"); // ✅ Success
+
       setSuccessMsg("Leave request submitted!");
       setType("Sick");
       setCategory("Leave with Pay");
@@ -64,6 +67,7 @@ const LeaveForm: React.FC<LeaveFormProps> = ({
       if (onSuccess) onSuccess();
       if (closeModal) closeModal();
     } catch (err: any) {
+      toast.error("Failed to submit leave."); // ❌ Error
       setErrorMsg(err.response?.data?.msg || "Failed to submit leave");
     }
   };

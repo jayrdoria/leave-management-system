@@ -6,6 +6,7 @@ import { EventClickArg } from "@fullcalendar/core";
 import { Dialog } from "@headlessui/react";
 import axios from "axios";
 import LeaveForm from "./LeaveForm";
+import toast from "react-hot-toast";
 
 interface LeaveEvent {
   id: string;
@@ -48,14 +49,22 @@ const EmployeeCalendar = () => {
         const end = new Date(new Date(item.endDate).getTime() + 86400000)
           .toISOString()
           .split("T")[0];
+
+        let bgColor = "#facc15"; // default to yellow for Pending
+        if (item.status === "Approved") bgColor = "#22c55e"; // green
+        else if (item.status === "Rejected") bgColor = "#ef4444"; // red
+
         return {
           id: item._id,
           title: `${item.type} – ${user.name || "Me"}`,
           start,
           end,
           allDay: true,
+          backgroundColor: bgColor,
+          borderColor: bgColor,
         };
       });
+
       setEvents(formatted);
     } catch (err) {
       console.error("Error loading events");
@@ -85,10 +94,17 @@ const EmployeeCalendar = () => {
   const cancelLeave = async () => {
     if (!viewDetails?._id) return;
     try {
-      await axios.delete(`http://localhost:5050/api/leave/${viewDetails._id}`);
+      const token = localStorage.getItem("token"); // ✅ Add this line
+      await axios.delete(`http://localhost:5050/api/leave/${viewDetails._id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`, // ✅ Attach token
+        },
+      });
+      toast.success("Leave cancelled successfully."); // ✅ success toast
       setShowDetails(false);
       fetchEvents();
     } catch (err) {
+      toast.error("Failed to cancel leave."); // ❌ error toast
       console.error("Failed to cancel leave");
     }
   };

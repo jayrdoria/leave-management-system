@@ -5,10 +5,10 @@ async function createTestUser() {
     const response = await axios.post(
       "http://localhost:5050/api/auth/create-test-user",
       {
-        name: "Jay-R Tech",
-        email: "jayr@company.com",
-        password: "jayr123",
-        role: "employee",
+        name: "Bien Tech",
+        email: "bien@company.com",
+        password: "bien123",
+        role: "manager",
         department: "Tech",
       }
     );
