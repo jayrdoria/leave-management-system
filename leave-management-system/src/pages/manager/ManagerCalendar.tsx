@@ -120,7 +120,10 @@ const ManagerCalendar = () => {
   const cancelOwnLeave = async () => {
     if (!viewDetails?._id) return;
     try {
-      await axios.delete(`http://localhost:5050/api/leave/${viewDetails._id}`);
+      await axios.delete(`http://localhost:5050/api/leave/${viewDetails._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
       toast.success("Leave cancelled successfully.");
       setShowDetails(false);
       fetchEvents();
@@ -227,32 +230,41 @@ const ManagerCalendar = () => {
             )}
 
             {/* Manager Actions */}
-            {viewDetails &&
-              viewDetails.userId._id !== user._id &&
-              viewDetails.status === "Pending" && (
-                <div className="mt-4 space-y-2">
-                  <textarea
-                    placeholder="Add comment (optional)"
-                    className="w-full border p-2 rounded text-sm"
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                  />
-                  <div className="flex gap-2">
+            {viewDetails?.status === "Pending" && (
+              <div className="mt-4 space-y-2">
+                <textarea
+                  placeholder="Add comment (optional)"
+                  className="w-full border p-2 rounded text-sm"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                />
+                <div className="flex gap-2 flex-wrap">
+                  {/* Approve / Reject for all pending leaves */}
+                  <button
+                    onClick={() => handleAction("Approved")}
+                    className="bg-green-500 text-white px-4 py-1 rounded"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => handleAction("Rejected")}
+                    className="bg-red-500 text-white px-4 py-1 rounded"
+                  >
+                    Reject
+                  </button>
+
+                  {/* ✅ Show Cancel only for own leave */}
+                  {viewDetails.userId === user._id && (
                     <button
-                      onClick={() => handleAction("Approved")}
-                      className="bg-green-500 text-white px-4 py-1 rounded"
+                      onClick={cancelOwnLeave}
+                      className="bg-yellow-500 text-white px-4 py-1 rounded"
                     >
-                      Approve
+                      Cancel My Leave
                     </button>
-                    <button
-                      onClick={() => handleAction("Rejected")}
-                      className="bg-red-500 text-white px-4 py-1 rounded"
-                    >
-                      Reject
-                    </button>
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
+            )}
 
             {viewDetails &&
               viewDetails.userId._id !== user._id &&

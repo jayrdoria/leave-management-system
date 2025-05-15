@@ -59,7 +59,7 @@ const LeaveHistory = () => {
               <thead className="bg-gray-200">
                 <tr>
                   <th className="px-4 py-2 text-left text-sm text-gray-700">
-                    Category
+                    Leave Type
                   </th>
                   <th className="px-4 py-2 text-left text-sm text-gray-700">
                     Start
