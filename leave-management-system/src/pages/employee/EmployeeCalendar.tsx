@@ -19,6 +19,7 @@ interface LeaveEvent {
 interface LeaveDetails {
   _id: string;
   type: string;
+  duration: string;
   category: string;
   startDate: string;
   endDate: string;
@@ -168,8 +169,8 @@ const EmployeeCalendar = () => {
             {viewDetails && (
               <div className="space-y-2 text-sm text-gray-700">
                 <p>
-                  <span className="font-semibold">Type:</span>{" "}
-                  {viewDetails.type}
+                  <span className="font-semibold">Duration:</span>{" "}
+                  {viewDetails.duration}
                 </p>
                 <p>
                   <span className="font-semibold">Category:</span>{" "}

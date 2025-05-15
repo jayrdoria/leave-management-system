@@ -11,6 +11,7 @@ import toast from "react-hot-toast";
 interface LeaveDetails {
   _id: string;
   type: string;
+  duration: string;
   category: string;
   startDate: string;
   endDate: string;
@@ -190,10 +191,12 @@ const ManagerCalendar = () => {
                   <span className="font-semibold">Name:</span>{" "}
                   {viewDetails.userId.name}
                 </p>
+
                 <p>
-                  <span className="font-semibold">Type:</span>{" "}
-                  {viewDetails.type}
+                  <span className="font-semibold">Duration:</span>{" "}
+                  {viewDetails.duration}
                 </p>
+
                 <p>
                   <span className="font-semibold">Category:</span>{" "}
                   {viewDetails.category}
@@ -254,7 +257,7 @@ const ManagerCalendar = () => {
                   </button>
 
                   {/* ✅ Show Cancel only for own leave */}
-                  {viewDetails.userId === user._id && (
+                  {viewDetails.userId._id === user._id && (
                     <button
                       onClick={cancelOwnLeave}
                       className="bg-yellow-500 text-white px-4 py-1 rounded"
@@ -267,8 +270,8 @@ const ManagerCalendar = () => {
             )}
 
             {viewDetails &&
-              viewDetails.userId._id !== user._id &&
-              viewDetails.status === "Approved" && (
+              viewDetails.status === "Approved" &&
+              user.role === "manager" && (
                 <div className="mt-4">
                   <button
                     onClick={() => handleAction("Pending")}
@@ -280,7 +283,7 @@ const ManagerCalendar = () => {
               )}
 
             {viewDetails &&
-              viewDetails.userId._id !== user._id &&
+              user.role === "manager" &&
               (viewDetails.status === "Approved" ||
                 viewDetails.status === "Rejected") && (
                 <div className="mt-4">
@@ -309,20 +312,6 @@ const ManagerCalendar = () => {
                     className="bg-red-600 text-white px-4 py-1 rounded"
                   >
                     Delete {viewDetails.status} Leave
-                  </button>
-                </div>
-              )}
-
-            {/* Cancel Own Leave */}
-            {viewDetails &&
-              viewDetails.userId._id === user._id &&
-              viewDetails.status === "Pending" && (
-                <div className="mt-6 text-right">
-                  <button
-                    onClick={cancelOwnLeave}
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                  >
-                    Cancel My Leave
                   </button>
                 </div>
               )}

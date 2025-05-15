@@ -17,7 +17,7 @@ router.post("/apply", async (req, res) => {
       deductCredits,
     } = req.body;
 
-    const user = await User.findById(userId); // Make sure to import User model
+    const user = await User.findById(userId);
 
     if (!user) {
       return res.status(404).json({ msg: "User not found" });
@@ -31,7 +31,7 @@ router.post("/apply", async (req, res) => {
       endDate,
       reason,
       deductCredits,
-      department: user.department, // ✅ Add department directly here
+      department: user.department,
     });
 
     await newLeave.save();
@@ -54,10 +54,12 @@ router.get("/mine/:userId", async (req, res) => {
   }
 });
 
-// Get a single leave by ID
 router.get("/one/:leaveId", async (req, res) => {
   try {
-    const leave = await Leave.findById(req.params.leaveId);
+    const leave = await Leave.findById(req.params.leaveId).populate(
+      "userId",
+      "name email _id"
+    ); // ✅ populate
     if (!leave) return res.status(404).json({ msg: "Leave not found" });
     res.json(leave);
   } catch (err) {
@@ -66,7 +68,6 @@ router.get("/one/:leaveId", async (req, res) => {
   }
 });
 
-// ✅ Manager View: Get all leaves in their department
 router.get("/manager/leaves", authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== "manager") {
@@ -81,7 +82,7 @@ router.get("/manager/leaves", authMiddleware, async (req, res) => {
 
     const leaves = await Leave.find({
       department: { $in: departments },
-    }).populate("userId", "name email");
+    }).populate("userId", "name email leaveCredits");
 
     res.status(200).json(leaves);
   } catch (err) {
@@ -90,7 +91,6 @@ router.get("/manager/leaves", authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ Manager Action: Approve or Reject Leave
 router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
   try {
     const { status, comment } = req.body;
@@ -111,15 +111,55 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
         .json({ msg: "Not authorized for this department." });
     }
 
-    // ✅ Support Cancel Approval
+    const user = await User.findById(leave.userId);
+    if (!user) {
+      return res.status(404).json({ msg: "Leave owner not found." });
+    }
+
+    // ✅ Cancel Approval
     if (status === "Pending") {
+      if (leave.status === "Approved" && leave.deductCredits) {
+        const start = new Date(leave.startDate);
+        const end = new Date(leave.endDate);
+        const timeDiff = end.getTime() - start.getTime();
+        const days = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)) + 1;
+
+        const refund = leave.duration === "Half Day" ? 0.5 : days;
+        user.leaveCredits += refund;
+        await user.save();
+      }
+
       leave.status = "Pending";
       leave.comment = "";
       leave.approverId = undefined;
-    } else if (["Approved", "Rejected"].includes(status)) {
+    }
+
+    // ✅ Approve or Reject
+    else if (["Approved", "Rejected"].includes(status)) {
       leave.status = status;
       leave.comment = comment || "";
       leave.approverId = req.user.id;
+
+      // ✅ Deduct leave credits only if approved and marked to deduct
+      if (status === "Approved" && leave.deductCredits) {
+        let deduction = 1;
+
+        if (leave.duration === "Half Day") {
+          deduction = 0.5;
+        } else {
+          const start = new Date(leave.startDate);
+          const end = new Date(leave.endDate);
+          const timeDiff = end.getTime() - start.getTime();
+          deduction = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)) + 1;
+        }
+
+        if (user.leaveCredits < deduction) {
+          return res.status(400).json({ msg: "Insufficient leave credits." });
+        }
+
+        user.leaveCredits -= deduction;
+        await user.save();
+      }
     } else {
       return res.status(400).json({ msg: "Invalid status." });
     }
@@ -144,15 +184,15 @@ router.delete("/:id", authMiddleware, async (req, res) => {
 
     const isOwner = leave.userId.toString() === userId;
     const isManagerOrAdmin = ["manager", "admin"].includes(req.user.role);
-
     const isPending = leave.status === "Pending";
     const isApprovedOrRejected = ["Approved", "Rejected"].includes(
       leave.status
     );
 
+    // ✅ Correct logic:
     const canDelete =
-      (isOwner && isPending) || // employee cancels pending leave
-      (isManagerOrAdmin && isApprovedOrRejected); // manager/admin deletes approved/rejected
+      (isOwner && isPending) || // Owner (employee/manager) cancels their pending leave
+      (isManagerOrAdmin && isApprovedOrRejected); // Manager/Admin deletes any approved/rejected leave
 
     if (!canDelete) {
       return res
@@ -160,7 +200,23 @@ router.delete("/:id", authMiddleware, async (req, res) => {
         .json({ msg: "You are not allowed to delete this leave." });
     }
 
+    // ✅ Refund credits if approved + deductCredits is true
+    if (leave.status === "Approved" && leave.deductCredits) {
+      const user = await User.findById(leave.userId);
+      if (user) {
+        const start = new Date(leave.startDate);
+        const end = new Date(leave.endDate);
+        const timeDiff = end.getTime() - start.getTime();
+        const days = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)) + 1;
+
+        const refund = leave.duration === "Half Day" ? 0.5 : days;
+        user.leaveCredits += refund;
+        await user.save();
+      }
+    }
+
     await Leave.findByIdAndDelete(leaveId);
+
     res.status(200).json({ msg: "Leave deleted successfully" });
   } catch (err) {
     console.error("Delete leave error:", err);

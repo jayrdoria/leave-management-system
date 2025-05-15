@@ -17,6 +17,11 @@ const leaveSchema = new mongoose.Schema(
       ],
       required: true,
     },
+    duration: {
+      type: String,
+      enum: ["Full Day", "Half Day"],
+      default: "Full Day",
+    },
     deductCredits: { type: Boolean, default: false },
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
@@ -28,8 +33,6 @@ const leaveSchema = new mongoose.Schema(
     },
     approverId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     comment: { type: String },
-
-    // ✅ Added this for manager filtering
     department: { type: String },
   },
   { timestamps: true }
