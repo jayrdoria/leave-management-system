@@ -24,9 +24,11 @@ mongoose
 // ✅ Routes
 const authRoutes = require("./routes/auth");
 const leaveRoutes = require("./routes/leave");
+const userRoutes = require("./routes/userRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/leave", leaveRoutes);
+app.use("/api/users", userRoutes);
 
 // ✅ 404 handler for undefined API routes
 app.use((req, res) => {

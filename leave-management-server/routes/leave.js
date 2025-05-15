@@ -9,7 +9,6 @@ router.post("/apply", async (req, res) => {
   try {
     const {
       userId,
-      type,
       category,
       duration,
       startDate,
@@ -26,7 +25,6 @@ router.post("/apply", async (req, res) => {
 
     const newLeave = new Leave({
       userId,
-      type,
       category,
       duration,
       startDate,

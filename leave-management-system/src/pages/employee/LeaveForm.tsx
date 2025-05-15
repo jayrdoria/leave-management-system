@@ -13,7 +13,6 @@ const LeaveForm: React.FC<LeaveFormProps> = ({
   closeModal,
   onSuccess,
 }) => {
-  const [type, setType] = useState("Sick");
   const [category, setCategory] = useState("Leave with Pay");
   const [duration, setDuration] = useState("Full Day");
   const [startDate, setStartDate] = useState("");
@@ -36,7 +35,7 @@ const LeaveForm: React.FC<LeaveFormProps> = ({
     setErrorMsg("");
 
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!user?.id) return setErrorMsg("User not logged in");
+    if (!user?._id) return setErrorMsg("User not logged in");
 
     const deductCredits =
       category === "Leave with Pay" ||
@@ -44,8 +43,7 @@ const LeaveForm: React.FC<LeaveFormProps> = ({
 
     try {
       await axios.post("http://localhost:5050/api/leave/apply", {
-        userId: user.id,
-        type,
+        userId: user._id,
         category,
         duration,
         startDate,
@@ -54,10 +52,9 @@ const LeaveForm: React.FC<LeaveFormProps> = ({
         deductCredits,
       });
 
-      toast.success("Leave submitted successfully!"); // ✅ Success
+      toast.success("Leave submitted successfully!");
 
       setSuccessMsg("Leave request submitted!");
-      setType("Sick");
       setCategory("Leave with Pay");
       setDuration("Full Day");
       setStartDate("");
@@ -67,7 +64,7 @@ const LeaveForm: React.FC<LeaveFormProps> = ({
       if (onSuccess) onSuccess();
       if (closeModal) closeModal();
     } catch (err: any) {
-      toast.error("Failed to submit leave."); // ❌ Error
+      toast.error("Failed to submit leave.");
       setErrorMsg(err.response?.data?.msg || "Failed to submit leave");
     }
   };
@@ -88,22 +85,6 @@ const LeaveForm: React.FC<LeaveFormProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">
-            Leave Type
-          </label>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="Sick">Sick</option>
-            <option value="Vacation">Vacation</option>
-            <option value="Casual">Casual</option>
-            <option value="Maternity">Maternity</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1">
             Category
           </label>
           <select
@@ -119,9 +100,6 @@ const LeaveForm: React.FC<LeaveFormProps> = ({
             <option value="Birthday Leave">Birthday Leave</option>
           </select>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">
             Duration
@@ -135,7 +113,9 @@ const LeaveForm: React.FC<LeaveFormProps> = ({
             <option value="Half Day">Half Day</option>
           </select>
         </div>
+      </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">
             Start Date

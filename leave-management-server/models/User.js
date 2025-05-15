@@ -15,6 +15,10 @@ const userSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    leaveCredits: {
+      type: Number,
+      default: 15, // default for all new users
+    },
   },
   { timestamps: true }
 );

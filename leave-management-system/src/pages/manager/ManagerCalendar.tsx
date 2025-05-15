@@ -228,7 +228,7 @@ const ManagerCalendar = () => {
 
             {/* Manager Actions */}
             {viewDetails &&
-              viewDetails.userId._id !== user.id &&
+              viewDetails.userId._id !== user._id &&
               viewDetails.status === "Pending" && (
                 <div className="mt-4 space-y-2">
                   <textarea
@@ -255,7 +255,7 @@ const ManagerCalendar = () => {
               )}
 
             {viewDetails &&
-              viewDetails.userId._id !== user.id &&
+              viewDetails.userId._id !== user._id &&
               viewDetails.status === "Approved" && (
                 <div className="mt-4">
                   <button
@@ -268,7 +268,7 @@ const ManagerCalendar = () => {
               )}
 
             {viewDetails &&
-              viewDetails.userId._id !== user.id &&
+              viewDetails.userId._id !== user._id &&
               (viewDetails.status === "Approved" ||
                 viewDetails.status === "Rejected") && (
                 <div className="mt-4">
@@ -303,7 +303,7 @@ const ManagerCalendar = () => {
 
             {/* Cancel Own Leave */}
             {viewDetails &&
-              viewDetails.userId._id === user.id &&
+              viewDetails.userId._id === user._id &&
               viewDetails.status === "Pending" && (
                 <div className="mt-6 text-right">
                   <button

@@ -3,13 +3,11 @@ import axios from "axios";
 
 interface LeaveEntry {
   _id: string;
-  type: string;
   category: string;
   startDate: string;
   endDate: string;
   status: string;
   reason?: string;
-  createdAt: string;
 }
 
 const LeaveHistory = () => {
@@ -17,18 +15,25 @@ const LeaveHistory = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // ✅ Get user from localStorage
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const leaveCredits = user?.leaveCredits ?? 0;
+
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!user?.id) return setError("User not logged in");
+    if (!user?._id) {
+      setError("User not logged in");
+      setLoading(false);
+      return;
+    }
 
     axios
-      .get(`http://localhost:5050/api/leave/mine/${user.id}`)
+      .get(`http://localhost:5050/api/leave/mine/${user._id}`)
       .then((res) => {
         setLeaves(res.data);
         setLoading(false);
       })
-      .catch((err) => {
-        setError("Failed to fetch leave history");
+      .catch(() => {
+        setError("Could not fetch leave history.");
         setLoading(false);
       });
   }, []);
@@ -36,11 +41,16 @@ const LeaveHistory = () => {
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-5xl mx-auto bg-white p-6 rounded shadow">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">
           My Leave History
         </h2>
 
-        {loading && <p className="text-gray-600">Loading...</p>}
+        <p className="text-gray-700 text-sm mb-4">
+          Leave Credit Balance:{" "}
+          <span className="font-semibold">{leaveCredits}</span> days
+        </p>
+
+        {loading && <p className="text-gray-500">Loading leave history...</p>}
         {error && <p className="text-red-600">{error}</p>}
 
         {!loading && !error && (
@@ -48,19 +58,16 @@ const LeaveHistory = () => {
             <table className="min-w-full table-auto border">
               <thead className="bg-gray-200">
                 <tr>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">
-                    Type
-                  </th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">
+                  <th className="px-4 py-2 text-left text-sm text-gray-700">
                     Category
                   </th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">
+                  <th className="px-4 py-2 text-left text-sm text-gray-700">
                     Start
                   </th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">
+                  <th className="px-4 py-2 text-left text-sm text-gray-700">
                     End
                   </th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">
+                  <th className="px-4 py-2 text-left text-sm text-gray-700">
                     Status
                   </th>
                 </tr>
@@ -68,9 +75,6 @@ const LeaveHistory = () => {
               <tbody>
                 {leaves.map((leave) => (
                   <tr key={leave._id} className="border-b">
-                    <td className="px-4 py-2 text-sm text-gray-800">
-                      {leave.type}
-                    </td>
                     <td className="px-4 py-2 text-sm text-gray-800">
                       {leave.category}
                     </td>

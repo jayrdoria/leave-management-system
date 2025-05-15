@@ -9,12 +9,14 @@ router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
   try {
+    // ✅ Make sure this line exists
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ msg: "Invalid credentials" });
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) return res.status(400).json({ msg: "Invalid credentials" });
 
+    // ✅ Only run this AFTER defining `user`
     const token = jwt.sign(
       {
         id: user._id,
@@ -26,21 +28,18 @@ router.post("/login", async (req, res) => {
       { expiresIn: "2h" }
     );
 
+    // ✅ Safely remove sensitive fields
+    const { passwordHash, __v, ...userData } = user.toObject();
+
     res.json({
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        role: user.role,
-        department: user.department,
-      },
+      user: userData, // this includes leaveCredits
     });
   } catch (err) {
-    console.error(err);
+    console.error("Login error:", err);
     res.status(500).send("Server error");
   }
 });
-
 // Create test user (TEMP)
 router.post("/create-test-user", async (req, res) => {
   const { name, email, password, role, department } = req.body;

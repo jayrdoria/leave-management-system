@@ -7,11 +7,6 @@ const leaveSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    type: {
-      type: String,
-      enum: ["Sick", "Vacation", "Casual", "Maternity"],
-      required: true,
-    },
     category: {
       type: String,
       enum: [

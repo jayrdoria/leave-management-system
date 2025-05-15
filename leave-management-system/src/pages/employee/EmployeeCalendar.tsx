@@ -39,24 +39,30 @@ const EmployeeCalendar = () => {
 
   const fetchEvents = async () => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!user?.id) return;
+
+    if (!user?._id) {
+      toast.error("User not logged in.");
+      return;
+    }
+
     try {
       const res = await axios.get(
-        `http://localhost:5050/api/leave/mine/${user.id}`
+        `http://localhost:5050/api/leave/mine/${user._id}`
       );
+
       const formatted = res.data.map((item: any) => {
         const start = new Date(item.startDate).toISOString().split("T")[0];
         const end = new Date(new Date(item.endDate).getTime() + 86400000)
           .toISOString()
           .split("T")[0];
 
-        let bgColor = "#facc15"; // default to yellow for Pending
-        if (item.status === "Approved") bgColor = "#22c55e"; // green
-        else if (item.status === "Rejected") bgColor = "#ef4444"; // red
+        let bgColor = "#facc15"; // yellow for Pending
+        if (item.status === "Approved") bgColor = "#22c55e";
+        else if (item.status === "Rejected") bgColor = "#ef4444";
 
         return {
           id: item._id,
-          title: `${item.type} – ${user.name || "Me"}`,
+          title: `${item.category} – ${user.name || "Me"}`,
           start,
           end,
           allDay: true,
@@ -67,7 +73,8 @@ const EmployeeCalendar = () => {
 
       setEvents(formatted);
     } catch (err) {
-      console.error("Error loading events");
+      toast.error("Error loading events.");
+      console.error("Error loading events", err);
     }
   };
 
