@@ -2,6 +2,21 @@ const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
 
+// ✅ Get user by ID
+router.get("/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    // Don't return password hash
+    const { passwordHash, __v, ...safeData } = user.toObject();
+    res.json(safeData);
+  } catch (err) {
+    console.error("Error fetching user by ID:", err);
+    res.status(500).json({ msg: "Error fetching user" });
+  }
+});
+
 // GET all users
 router.get("/", async (req, res) => {
   try {

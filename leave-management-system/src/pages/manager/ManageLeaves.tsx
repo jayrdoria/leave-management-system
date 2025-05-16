@@ -20,16 +20,24 @@ interface Leave {
 const ManageLeaves: React.FC = () => {
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [commentMap, setCommentMap] = useState<{ [key: string]: string }>({});
-
   const token = localStorage.getItem("token");
 
   useEffect(() => {
     const fetchLeaves = async () => {
       try {
-        const res = await axios.get("/leave/manager/leaves", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setLeaves(res.data);
+        const res = await axios.get(
+          "http://localhost:5050/api/leave/manager/leaves",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        const sorted = res.data.sort(
+          (a: Leave, b: Leave) =>
+            new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+        );
+
+        setLeaves(sorted);
       } catch (err) {
         console.error("Error fetching leaves", err);
       }
@@ -45,14 +53,9 @@ const ManageLeaves: React.FC = () => {
     try {
       const comment = commentMap[id] || "";
       await axios.put(
-        `/leave/manager/leave/${id}`,
-        {
-          status: action,
-          comment,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        `http://localhost:5050/api/leave/manager/leave/${id}`,
+        { status: action, comment },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
       toast.success(
@@ -71,36 +74,48 @@ const ManageLeaves: React.FC = () => {
   };
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Manage Department Leaves</h1>
-      <div className="space-y-4">
-        {leaves.length === 0 ? (
-          <div className="text-center text-gray-500 text-sm italic">
-            No leave requests in your department yet.
-          </div>
-        ) : (
-          leaves.map((leave) => (
+    <div className="p-6 max-w-6xl mx-auto">
+      <h1 className="text-2xl font-bold mb-6 text-gray-800">
+        Manage Department Leaves
+      </h1>
+
+      {leaves.length === 0 ? (
+        <div className="text-center text-gray-500 text-sm italic">
+          No leave requests in your department yet.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {leaves.map((leave) => (
             <div
               key={leave._id}
-              className="border p-4 rounded shadow bg-white space-y-2"
+              className="border border-gray-200 p-5 rounded-lg shadow-sm bg-white space-y-2"
             >
-              {/* Existing leave content */}
-              <div>
-                <strong>{leave.userId.name}</strong> — {leave.type} (
-                {leave.category})
+              <div className="text-sm text-gray-700">
+                <p className="font-semibold">{leave.userId.name}</p>
+                <p className="text-xs text-gray-500">{leave.userId.email}</p>
               </div>
-              <div>
-                <span className="font-medium">From:</span>{" "}
-                {leave.startDate.slice(0, 10)}
-                {" → "}
-                <span className="font-medium">To:</span>{" "}
-                {leave.endDate.slice(0, 10)}
+
+              <div className="text-sm">
+                <p>
+                  <span className="font-medium">Type:</span> {leave.type}
+                </p>
+                <p>
+                  <span className="font-medium">Category:</span>{" "}
+                  {leave.category}
+                </p>
+                <p>
+                  <span className="font-medium">Dates:</span>{" "}
+                  {new Date(leave.startDate).toLocaleDateString()} →{" "}
+                  {new Date(leave.endDate).toLocaleDateString()}
+                </p>
+                <p>
+                  <span className="font-medium">Reason:</span>{" "}
+                  {leave.reason || "—"}
+                </p>
+                <p>
+                  <span className="font-medium">Status:</span> {leave.status}
+                </p>
               </div>
-              <div>
-                <span className="font-medium">Reason:</span>{" "}
-                {leave.reason || "None"}
-              </div>
-              <div className="font-medium">Status: {leave.status}</div>
 
               {leave.status === "Pending" && (
                 <div className="space-y-2">
@@ -117,13 +132,13 @@ const ManageLeaves: React.FC = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleAction(leave._id, "Approved")}
-                      className="bg-green-500 text-white px-4 py-1 rounded"
+                      className="bg-green-500 text-white px-4 py-1 rounded text-sm"
                     >
                       Approve
                     </button>
                     <button
                       onClick={() => handleAction(leave._id, "Rejected")}
-                      className="bg-red-500 text-white px-4 py-1 rounded"
+                      className="bg-red-500 text-white px-4 py-1 rounded text-sm"
                     >
                       Reject
                     </button>
@@ -135,7 +150,7 @@ const ManageLeaves: React.FC = () => {
                 <div className="mt-2">
                   <button
                     onClick={() => handleAction(leave._id, "Pending")}
-                    className="bg-yellow-500 text-white px-4 py-1 rounded"
+                    className="bg-yellow-500 text-white px-4 py-1 rounded text-sm"
                   >
                     Cancel Approval
                   </button>
@@ -143,14 +158,14 @@ const ManageLeaves: React.FC = () => {
               )}
 
               {leave.comment && (
-                <div className="text-sm text-gray-700">
+                <div className="text-sm text-gray-600 pt-2">
                   <span className="font-medium">Comment:</span> {leave.comment}
                 </div>
               )}
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

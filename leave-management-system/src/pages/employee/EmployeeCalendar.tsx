@@ -27,8 +27,18 @@ interface LeaveDetails {
   reason?: string;
   createdAt: string;
   user?: {
+    _id: string;
     name: string;
+    email?: string;
   };
+}
+
+interface LoggedInUser {
+  _id: string;
+  name: string;
+  email?: string;
+  role?: string;
+  department?: string;
 }
 
 const EmployeeCalendar = () => {
@@ -37,19 +47,16 @@ const EmployeeCalendar = () => {
   const [events, setEvents] = useState<LeaveEvent[]>([]);
   const [viewDetails, setViewDetails] = useState<LeaveDetails | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const user: LoggedInUser = JSON.parse(localStorage.getItem("user") || "{}");
 
   const fetchEvents = async () => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-
-    if (!user?._id) {
-      toast.error("User not logged in.");
-      return;
-    }
-
     try {
-      const res = await axios.get(
-        `http://localhost:5050/api/leave/mine/${user._id}`
-      );
+      const token = localStorage.getItem("token");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+      const res = await axios.get(`http://localhost:5050/api/leave/scoped`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       const formatted = res.data.map((item: any) => {
         const start = new Date(item.startDate).toISOString().split("T")[0];
@@ -57,13 +64,18 @@ const EmployeeCalendar = () => {
           .toISOString()
           .split("T")[0];
 
-        let bgColor = "#facc15"; // yellow for Pending
+        let bgColor = "#facc15";
         if (item.status === "Approved") bgColor = "#22c55e";
         else if (item.status === "Rejected") bgColor = "#ef4444";
 
+        const label =
+          item.userId?.name === user.name
+            ? `${item.category} – Me`
+            : `${item.category} – ${item.userId?.name}`;
+
         return {
           id: item._id,
-          title: `${item.category} – ${user.name || "Me"}`,
+          title: label,
           start,
           end,
           allDay: true,
@@ -74,8 +86,8 @@ const EmployeeCalendar = () => {
 
       setEvents(formatted);
     } catch (err) {
-      toast.error("Error loading events.");
-      console.error("Error loading events", err);
+      toast.error("Error loading calendar");
+      console.error("Error loading scoped events", err);
     }
   };
 
@@ -197,14 +209,16 @@ const EmployeeCalendar = () => {
               </div>
             )}
             <div className="mt-6 flex justify-end gap-3">
-              {viewDetails?.status === "Pending" && (
-                <button
-                  onClick={cancelLeave}
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                >
-                  Cancel Leave
-                </button>
-              )}
+              {viewDetails?.status === "Pending" &&
+                viewDetails?.user?._id === user._id && (
+                  <button
+                    onClick={cancelLeave}
+                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                  >
+                    Cancel Leave
+                  </button>
+                )}
+
               <button
                 onClick={() => setShowDetails(false)}
                 className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm"

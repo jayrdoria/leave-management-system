@@ -23,6 +23,7 @@ router.post("/login", async (req, res) => {
         role: user.role,
         name: user.name,
         department: user.department,
+        departmentScope: user.departmentScope || [], // ✅ Add this
       },
       process.env.JWT_SECRET,
       { expiresIn: "2h" }

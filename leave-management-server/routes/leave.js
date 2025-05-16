@@ -54,6 +54,29 @@ router.get("/mine/:userId", async (req, res) => {
   }
 });
 
+// ✅ GET /api/leave/scoped — View all leaves in employee's department scope
+router.get("/scoped", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    const departments = user.departmentScope?.length
+      ? [...new Set([user.department, ...user.departmentScope])]
+      : [user.department];
+
+    const leaves = await Leave.find({
+      department: { $in: departments },
+      status: { $ne: "Rejected" },
+    }).populate("userId", "name department");
+
+    res.status(200).json(leaves);
+  } catch (err) {
+    console.error("Scoped view error:", err);
+    res.status(500).json({ msg: "Failed to load department leaves" });
+  }
+});
+
 router.get("/one/:leaveId", async (req, res) => {
   try {
     const leave = await Leave.findById(req.params.leaveId).populate(
@@ -61,7 +84,10 @@ router.get("/one/:leaveId", async (req, res) => {
       "name email _id"
     ); // ✅ populate
     if (!leave) return res.status(404).json({ msg: "Leave not found" });
-    res.json(leave);
+    res.json({
+      ...leave.toObject(),
+      user: leave.userId, // ✅ attach populated userId as `user`
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: "Failed to fetch leave" });
