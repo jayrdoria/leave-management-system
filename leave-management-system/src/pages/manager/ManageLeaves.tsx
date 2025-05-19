@@ -21,16 +21,14 @@ const ManageLeaves: React.FC = () => {
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [commentMap, setCommentMap] = useState<{ [key: string]: string }>({});
   const token = localStorage.getItem("token");
+  const API = process.env.REACT_APP_API_BASE_URL;
 
   useEffect(() => {
     const fetchLeaves = async () => {
       try {
-        const res = await axios.get(
-          "http://localhost:5050/api/leave/manager/leaves",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await axios.get(`${API}/leave/manager/leaves`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         const sorted = res.data.sort(
           (a: Leave, b: Leave) =>
@@ -53,7 +51,7 @@ const ManageLeaves: React.FC = () => {
     try {
       const comment = commentMap[id] || "";
       await axios.put(
-        `http://localhost:5050/api/leave/manager/leave/${id}`,
+        `${API}/leave/manager/leave/${id}`,
         { status: action, comment },
         { headers: { Authorization: `Bearer ${token}` } }
       );

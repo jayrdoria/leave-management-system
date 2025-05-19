@@ -7,13 +7,14 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const navigate = useNavigate();
+  const API = process.env.REACT_APP_API_BASE_URL;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
 
     try {
-      const res = await axios.post("http://localhost:5050/api/auth/login", {
+      const res = await axios.post(`${API}/auth/login`, {
         email,
         password,
       });

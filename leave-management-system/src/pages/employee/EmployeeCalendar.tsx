@@ -48,13 +48,14 @@ const EmployeeCalendar = () => {
   const [viewDetails, setViewDetails] = useState<LeaveDetails | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const user: LoggedInUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const API = process.env.REACT_APP_API_BASE_URL;
 
   const fetchEvents = async () => {
     try {
       const token = localStorage.getItem("token");
       const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-      const res = await axios.get(`http://localhost:5050/api/leave/scoped`, {
+      const res = await axios.get(`${API}/leave/scoped`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -103,7 +104,7 @@ const EmployeeCalendar = () => {
   const handleEventClick = async (arg: EventClickArg) => {
     const id = arg.event.id;
     try {
-      const res = await axios.get(`http://localhost:5050/api/leave/one/${id}`);
+      const res = await axios.get(`${API}/leave/one/${id}`);
       setViewDetails(res.data);
       setShowDetails(true);
     } catch (err) {
@@ -115,7 +116,7 @@ const EmployeeCalendar = () => {
     if (!viewDetails?._id) return;
     try {
       const token = localStorage.getItem("token"); // ✅ Add this line
-      await axios.delete(`http://localhost:5050/api/leave/${viewDetails._id}`, {
+      await axios.delete(`${API}/leave/${viewDetails._id}`, {
         headers: {
           Authorization: `Bearer ${token}`, // ✅ Attach token
         },

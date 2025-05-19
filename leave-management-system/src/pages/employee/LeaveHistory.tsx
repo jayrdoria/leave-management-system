@@ -14,6 +14,7 @@ const LeaveHistory = () => {
   const [leaves, setLeaves] = useState<LeaveEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const API = process.env.REACT_APP_API_BASE_URL;
 
   // ✅ Get user from localStorage
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -27,7 +28,7 @@ const LeaveHistory = () => {
     }
 
     axios
-      .get(`http://localhost:5050/api/leave/mine/${user._id}`)
+      .get(`${API}/leave/mine/${user._id}`)
       .then((res) => {
         setLeaves(res.data);
         setLoading(false);

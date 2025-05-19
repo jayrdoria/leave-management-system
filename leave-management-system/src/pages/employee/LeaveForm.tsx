@@ -20,6 +20,7 @@ const LeaveForm: React.FC<LeaveFormProps> = ({
   const [reason, setReason] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const API = process.env.REACT_APP_API_BASE_URL;
 
   useEffect(() => {
     if (selectedDate) {
@@ -42,7 +43,7 @@ const LeaveForm: React.FC<LeaveFormProps> = ({
       category === "Reduction of Overtime / Offset";
 
     try {
-      await axios.post("http://localhost:5050/api/leave/apply", {
+      await axios.post(`${API}/leave/apply`, {
         userId: user._id,
         category,
         duration,

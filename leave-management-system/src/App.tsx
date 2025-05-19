@@ -10,11 +10,11 @@ import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
 import ManagerDashboard from "./pages/manager/ManagerDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserInfo from "./pages/employee/UserInfo";
-import ProtectedRoute from "./components/ProtectedRoute"; // ✅ import this
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/leave-system">
       <Routes>
         {/* Public route */}
         <Route path="/" element={<Login />} />

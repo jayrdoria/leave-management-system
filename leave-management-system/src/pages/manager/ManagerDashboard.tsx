@@ -20,16 +20,17 @@ const ManagerDashboard = () => {
   const [upcomingLeaves, setUpcomingLeaves] = useState<LeaveEntry[]>([]);
   const [totalLeaves, setTotalLeaves] = useState<number>(0);
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const API = process.env.REACT_APP_API_BASE_URL;
 
   const fetchDashboard = async () => {
     try {
       const token = localStorage.getItem("token");
 
       const [scopedLeavesRes, userRes] = await Promise.all([
-        axios.get("http://localhost:5050/api/leave/manager/leaves", {
+        axios.get(`${API}/leave/manager/leaves`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`http://localhost:5050/api/users/${user._id}`),
+        axios.get(`${API}/users/${user._id}`),
       ]);
 
       const scopedLeaves = scopedLeavesRes.data;

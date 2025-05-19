@@ -34,18 +34,16 @@ const ManagerCalendar = () => {
   const [viewDetails, setViewDetails] = useState<LeaveDetails | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [comment, setComment] = useState("");
+  const API = process.env.REACT_APP_API_BASE_URL;
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const token = localStorage.getItem("token");
 
   const fetchEvents = async () => {
     try {
-      const res = await axios.get(
-        "http://localhost:5050/api/leave/manager/leaves",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await axios.get(`${API}/leave/manager/leaves`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       const formatted = res.data.map((item: LeaveDetails) => {
         const start = new Date(item.startDate).toISOString().split("T")[0];
@@ -86,7 +84,7 @@ const ManagerCalendar = () => {
   const handleEventClick = async (arg: EventClickArg) => {
     const id = arg.event.id;
     try {
-      const res = await axios.get(`http://localhost:5050/api/leave/one/${id}`);
+      const res = await axios.get(`${API}/leave/one/${id}`);
       setViewDetails(res.data);
       setShowDetails(true);
     } catch (err) {
@@ -98,7 +96,7 @@ const ManagerCalendar = () => {
     if (!viewDetails) return;
     try {
       await axios.put(
-        `http://localhost:5050/api/leave/manager/leave/${viewDetails._id}`,
+        `${API}/leave/manager/leave/${viewDetails._id}`,
         { status, comment },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -121,7 +119,7 @@ const ManagerCalendar = () => {
   const cancelOwnLeave = async () => {
     if (!viewDetails?._id) return;
     try {
-      await axios.delete(`http://localhost:5050/api/leave/${viewDetails._id}`, {
+      await axios.delete(`${API}/leave/${viewDetails._id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -295,12 +293,9 @@ const ManagerCalendar = () => {
                       if (!confirmed) return;
 
                       try {
-                        await axios.delete(
-                          `http://localhost:5050/api/leave/${viewDetails._id}`,
-                          {
-                            headers: { Authorization: `Bearer ${token}` },
-                          }
-                        );
+                        await axios.delete(`${API}/leave/${viewDetails._id}`, {
+                          headers: { Authorization: `Bearer ${token}` },
+                        });
                         toast.success("Leave deleted successfully.");
                         setShowDetails(false);
                         fetchEvents();

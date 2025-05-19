@@ -15,12 +15,13 @@ const EmployeeDashboard = () => {
   const [upcomingLeaves, setUpcomingLeaves] = useState<LeaveEntry[]>([]);
   const [totalLeaves, setTotalLeaves] = useState<number>(0);
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const API = process.env.REACT_APP_API_BASE_URL;
 
   const fetchDashboard = async () => {
     try {
       const [leaveRes, userRes] = await Promise.all([
-        axios.get(`http://localhost:5050/api/leave/mine/${user._id}`),
-        axios.get(`http://localhost:5050/api/users/${user._id}`),
+        axios.get(`${API}/leave/mine/${user._id}`),
+        axios.get(`${API}/users/${user._id}`),
       ]);
 
       const allLeaves = leaveRes.data;
