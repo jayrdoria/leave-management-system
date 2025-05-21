@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
@@ -8,6 +8,19 @@ const Login = () => {
   const [errorMsg, setErrorMsg] = useState("");
   const navigate = useNavigate();
   const API = process.env.REACT_APP_API_BASE_URL;
+
+  // ✅ Redirect if already logged in
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const user = localStorage.getItem("user");
+
+    if (token && user) {
+      const parsed = JSON.parse(user);
+      if (parsed.role === "admin") navigate("/admin");
+      else if (parsed.role === "manager") navigate("/manager");
+      else navigate("/employee");
+    }
+  }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +37,7 @@ const Login = () => {
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
 
-      // Redirect based on role
+      // ✅ Redirect based on role
       if (user.role === "admin") navigate("/admin");
       else if (user.role === "manager") navigate("/manager");
       else navigate("/employee");

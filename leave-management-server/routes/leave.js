@@ -18,9 +18,24 @@ router.post("/apply", async (req, res) => {
     } = req.body;
 
     const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ msg: "User not found" });
 
-    if (!user) {
-      return res.status(404).json({ msg: "User not found" });
+    // ✅ If deduction is required, check if user has enough credits
+    if (deductCredits) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const durationDays =
+        duration === "Half Day"
+          ? 0.5
+          : Math.ceil(
+              (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
+            ) + 1;
+
+      if (user.leaveCredits < durationDays) {
+        return res
+          .status(400)
+          .json({ msg: "Insufficient leave credits to apply for this leave." });
+      }
     }
 
     const newLeave = new Leave({
@@ -37,16 +52,17 @@ router.post("/apply", async (req, res) => {
     await newLeave.save();
     res.status(201).json({ msg: "Leave applied successfully" });
   } catch (err) {
-    console.error(err);
+    console.error("Apply leave error:", err);
     res.status(500).json({ msg: "Error applying for leave" });
   }
 });
 
 router.get("/mine/:userId", async (req, res) => {
   try {
-    const leaves = await Leave.find({ userId: req.params.userId }).sort({
-      createdAt: -1,
-    });
+    const leaves = await Leave.find({ userId: req.params.userId })
+      .sort({ createdAt: -1 })
+      .populate("userId", "name department"); // ✅ populate user name & department
+
     res.json(leaves);
   } catch (err) {
     console.error(err);
@@ -247,6 +263,85 @@ router.delete("/:id", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Delete leave error:", err);
     res.status(500).json({ msg: "Failed to delete leave" });
+  }
+});
+
+// ✅ GET /leave/all — Admin: View all leave records (company-wide)
+router.get("/all", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ msg: "Access denied. Admins only." });
+    }
+
+    const leaves = await Leave.find().populate(
+      "userId",
+      "name email department"
+    );
+    res.status(200).json(leaves);
+  } catch (err) {
+    console.error("Admin GET all leaves error:", err);
+    res.status(500).json({ msg: "Failed to fetch leave records" });
+  }
+});
+
+// ✅ PUT /leave/admin/leave/:id — Admin can approve or reject any leave
+router.put("/admin/leave/:id", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ msg: "Access denied. Admins only." });
+    }
+
+    const { status, comment } = req.body;
+    const leave = await Leave.findById(req.params.id);
+    if (!leave) return res.status(404).json({ msg: "Leave not found" });
+
+    const user = await User.findById(leave.userId);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    if (status === "Pending") {
+      if (leave.status === "Approved" && leave.deductCredits) {
+        const start = new Date(leave.startDate);
+        const end = new Date(leave.endDate);
+        const days =
+          Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
+          1;
+        const refund = leave.duration === "Half Day" ? 0.5 : days;
+        user.leaveCredits += refund;
+        await user.save();
+      }
+
+      leave.status = "Pending";
+      leave.comment = "";
+      leave.approverId = undefined;
+    } else if (["Approved", "Rejected"].includes(status)) {
+      leave.status = status;
+      leave.comment = comment || "";
+      leave.approverId = req.user._id;
+
+      if (status === "Approved" && leave.deductCredits) {
+        const start = new Date(leave.startDate);
+        const end = new Date(leave.endDate);
+        const days =
+          Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
+          1;
+        const deduction = leave.duration === "Half Day" ? 0.5 : days;
+
+        if (user.leaveCredits < deduction) {
+          return res.status(400).json({ msg: "Insufficient leave credits." });
+        }
+
+        user.leaveCredits -= deduction;
+        await user.save();
+      }
+    } else {
+      return res.status(400).json({ msg: "Invalid status." });
+    }
+
+    await leave.save();
+    res.status(200).json({ msg: `Leave updated to ${leave.status}` });
+  } catch (err) {
+    console.error("Admin update leave error:", err);
+    res.status(500).json({ msg: "Failed to update leave status." });
   }
 });
 

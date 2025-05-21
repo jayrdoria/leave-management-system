@@ -9,7 +9,14 @@ const DashboardLayout = ({ role }: Props) => {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
   const links = {
-    admin: [{ label: "Dashboard", path: "/admin" }],
+    admin: [
+      { label: "Dashboard", path: "/admin" },
+      { label: "Manage Leaves", path: "/admin/leaves" },
+      { label: "Calendar", path: "/admin/calendar" },
+      { label: "Leave History", path: "/admin/history" },
+      { label: "User Info", path: "/admin/profile" },
+      { label: "User Management", path: "/admin/user-management" },
+    ],
     manager: [
       { label: "Dashboard", path: "/manager" },
       { label: "Manage Leaves", path: "/manager/leaves" },

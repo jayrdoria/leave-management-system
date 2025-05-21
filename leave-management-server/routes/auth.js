@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const authMiddleware = require("../middleware/auth");
 
 // Login route
 router.post("/login", async (req, res) => {
@@ -65,6 +66,10 @@ router.post("/create-test-user", async (req, res) => {
     console.error(err);
     res.status(500).json({ msg: "Error creating user" });
   }
+});
+
+router.get("/validate", authMiddleware, (req, res) => {
+  return res.status(200).json({ msg: "Token valid", user: req.user });
 });
 
 module.exports = router;

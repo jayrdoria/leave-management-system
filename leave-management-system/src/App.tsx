@@ -11,6 +11,9 @@ import ManagerDashboard from "./pages/manager/ManagerDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserInfo from "./pages/employee/UserInfo";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminUserManagement from "./pages/admin/AdminUserManagement";
+import AdminCalendar from "./pages/admin/AdminCalendar";
+import AdminManageLeaves from "./pages/admin/AdminManageLeaves";
 
 function App() {
   return (
@@ -24,6 +27,11 @@ function App() {
           {/* Admin */}
           <Route path="/admin" element={<DashboardLayout role="admin" />}>
             <Route index element={<AdminDashboard />} />
+            <Route path="calendar" element={<AdminCalendar />} />
+            <Route path="leaves" element={<AdminManageLeaves />} />
+            <Route path="history" element={<LeaveHistory />} />
+            <Route path="profile" element={<UserInfo />} />
+            <Route path="user-management" element={<AdminUserManagement />} />
           </Route>
 
           {/* Manager */}
