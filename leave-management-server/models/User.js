@@ -19,6 +19,17 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 15, // default for all new users
     },
+    country: {
+      type: String,
+      enum: ["PH", "Malta"],
+      required: true,
+      default: "PH",
+    },
+    sex: {
+      type: String,
+      enum: ["Male", "Female"],
+      required: true,
+    },
   },
   { timestamps: true }
 );

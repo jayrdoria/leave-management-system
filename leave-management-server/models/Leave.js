@@ -14,6 +14,8 @@ const leaveSchema = new mongoose.Schema(
         "Leave without Pay",
         "Reduction of Overtime / Offset",
         "Birthday Leave",
+        "Paternity Leave",
+        "Maternity Leave", // ✅ add these
       ],
       required: true,
     },

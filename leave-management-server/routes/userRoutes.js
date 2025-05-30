@@ -1,8 +1,26 @@
 const express = require("express");
 const router = express.Router();
-const User = require("../models/User");
 const bcrypt = require("bcryptjs");
+
+const User = require("../models/User");
 const Leave = require("../models/Leave");
+const LeaveActionLog = require("../models/LeaveActionLog");
+const authMiddleware = require("../middleware/auth");
+
+// ✅ GET LEAVE ACTION LOGS
+router.get("/leave-action-logs", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ msg: "Unauthorized" });
+    }
+
+    const logs = await LeaveActionLog.find().sort({ timestamp: -1 }).limit(50);
+    res.json(logs);
+  } catch (err) {
+    console.error("Fetch logs error:", err);
+    res.status(500).json({ msg: "Error fetching logs" });
+  }
+});
 
 // ✅ GET all users
 router.get("/", async (req, res) => {
@@ -29,16 +47,19 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+// ✅ CREATE user
 router.post("/", async (req, res) => {
   try {
     const {
       name,
       email,
-      passwordHash, // sent as plain password from frontend
+      passwordHash,
       role,
       department,
       departmentScope,
       leaveCredits,
+      country,
+      sex,
     } = req.body;
 
     const existing = await User.findOne({ email });
@@ -54,6 +75,8 @@ router.post("/", async (req, res) => {
       department,
       departmentScope,
       leaveCredits,
+      country,
+      sex,
     });
 
     await newUser.save();
@@ -68,8 +91,6 @@ router.post("/", async (req, res) => {
 router.patch("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Only allow safe updates
     const allowedFields = [
       "name",
       "email",
@@ -77,6 +98,8 @@ router.patch("/:id", async (req, res) => {
       "department",
       "departmentScope",
       "leaveCredits",
+      "country",
+      "sex",
     ];
     const updates = {};
 
@@ -111,15 +134,108 @@ router.delete("/:id", async (req, res) => {
     const deletedUser = await User.findByIdAndDelete(userId);
     if (!deletedUser) return res.status(404).json({ msg: "User not found" });
 
-    // ✅ Delete all leaves belonging to the deleted user
     await Leave.deleteMany({ userId });
-
     res
       .status(200)
       .json({ msg: "User and related leaves deleted successfully" });
   } catch (err) {
     console.error("Error deleting user:", err);
     res.status(500).json({ msg: "Failed to delete user" });
+  }
+});
+
+// ✅ RESET LEAVES
+router.post("/reset-leaves", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ msg: "Unauthorized" });
+    }
+
+    await User.updateMany({}, { $set: { leaveCredits: 0 } });
+
+    await LeaveActionLog.create({
+      action: "Reset Leaves",
+      performedBy: req.user.name,
+    });
+
+    res.json({ msg: "All leave credits reset to 0" });
+  } catch (err) {
+    console.error("Reset error:", err);
+    res.status(500).json({ msg: "Error resetting leave credits" });
+  }
+});
+
+// ✅ ADD STANDARD LEAVES
+router.post("/add-standard-leaves", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ msg: "Unauthorized" });
+    }
+
+    const users = await User.find();
+
+    const bulkOps = users.map((user) => {
+      const standard =
+        user.country === "PH" ? 15 : user.country === "Malta" ? 24 : 0;
+      return {
+        updateOne: {
+          filter: { _id: user._id },
+          update: { $inc: { leaveCredits: standard } },
+        },
+      };
+    });
+
+    await User.bulkWrite(bulkOps);
+
+    await LeaveActionLog.create({
+      action: "Add Standard Leaves",
+      performedBy: req.user.name,
+    });
+
+    res.json({ msg: "Standard leave credits added based on country" });
+  } catch (err) {
+    console.error("Add standard leave error:", err);
+    res.status(500).json({ msg: "Error adding standard leave credits" });
+  }
+});
+
+// POST /api/users/add-parent-leave
+router.post("/add-parent-leave", authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const admin = req.user;
+
+    if (admin.role !== "admin") {
+      return res.status(403).json({ msg: "Unauthorized" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    const creditsToAdd =
+      user.sex === "Male" ? 10 : user.sex === "Female" ? 45 : 0;
+
+    if (creditsToAdd === 0) {
+      return res
+        .status(400)
+        .json({ msg: "User sex not defined for parent leave." });
+    }
+
+    user.leaveCredits += creditsToAdd;
+    await user.save();
+
+    await LeaveActionLog.create({
+      action: `Added ${creditsToAdd} ${
+        user.sex === "Male" ? "Paternity" : "Maternity"
+      } Leave credits to ${user.name}`,
+      performedBy: admin.name,
+      timestamp: new Date(),
+    });
+
+    res.status(200).json({ msg: "Parent leave credits added." });
+  } catch (err) {
+    console.error("Parent leave add error:", err);
+    res.status(500).json({ msg: "Server error while adding parent leave." });
   }
 });
 

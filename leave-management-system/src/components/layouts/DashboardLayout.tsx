@@ -15,6 +15,8 @@ const DashboardLayout = ({ role }: Props) => {
       { label: "Calendar", path: "/admin/calendar" },
       { label: "Leave History", path: "/admin/history" },
       { label: "User Info", path: "/admin/profile" },
+      { label: "Admin Apply Leave", path: "/admin/apply-leave" },
+      { label: "Admin Leave Control", path: "/admin/leave-control" },
       { label: "User Management", path: "/admin/user-management" },
     ],
     manager: [
@@ -58,15 +60,50 @@ const DashboardLayout = ({ role }: Props) => {
           </div>
 
           <nav className="p-4 space-y-2">
-            {links[role].map((link) => (
-              <button
-                key={link.path}
-                onClick={() => navigate(link.path)}
-                className="block text-left text-gray-700 hover:text-blue-600 py-2 px-3 rounded hover:bg-gray-100 w-full"
-              >
-                {link.label}
-              </button>
-            ))}
+            {/* Role-based links except for admin-only pages */}
+            {links[role]
+              .filter(
+                (link) =>
+                  role !== "admin" ||
+                  (link.label !== "Admin Apply Leave" &&
+                    link.label !== "User Management" &&
+                    link.label !== "Admin Leave Control")
+              )
+              .map((link) => (
+                <button
+                  key={link.path}
+                  onClick={() => navigate(link.path)}
+                  className="block text-left text-gray-700 hover:text-blue-600 py-2 px-3 rounded hover:bg-gray-100 w-full"
+                >
+                  {link.label}
+                </button>
+              ))}
+
+            {/* Admin-only section */}
+            {role === "admin" && (
+              <>
+                <hr className="my-2 border-gray-200" />
+                <p className="text-xs font-semibold text-gray-500 px-3">
+                  Admin Functions
+                </p>
+                {links.admin
+                  .filter(
+                    (link) =>
+                      link.label === "Admin Apply Leave" ||
+                      link.label === "User Management" ||
+                      link.label === "Admin Leave Control"
+                  )
+                  .map((link) => (
+                    <button
+                      key={link.path}
+                      onClick={() => navigate(link.path)}
+                      className="block text-left text-gray-700 hover:text-blue-600 py-2 px-3 rounded hover:bg-gray-100 w-full"
+                    >
+                      {link.label}
+                    </button>
+                  ))}
+              </>
+            )}
           </nav>
         </div>
 

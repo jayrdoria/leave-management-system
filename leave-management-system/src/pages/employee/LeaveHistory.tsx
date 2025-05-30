@@ -10,15 +10,18 @@ interface LeaveEntry {
   reason?: string;
 }
 
-const LeaveHistory = () => {
+interface LeaveHistoryProps {
+  refreshTrigger?: boolean;
+}
+
+const LeaveHistory: React.FC<LeaveHistoryProps> = ({ refreshTrigger }) => {
   const [leaves, setLeaves] = useState<LeaveEntry[]>([]);
+  const [leaveCredits, setLeaveCredits] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const API = process.env.REACT_APP_API_BASE_URL;
 
-  // ✅ Get user from localStorage
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const leaveCredits = user?.leaveCredits ?? 0;
 
   useEffect(() => {
     if (!user?._id) {
@@ -27,17 +30,24 @@ const LeaveHistory = () => {
       return;
     }
 
-    axios
-      .get(`${API}/leave/mine/${user._id}`)
-      .then((res) => {
-        setLeaves(res.data);
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [leaveRes, userRes] = await Promise.all([
+          axios.get(`${API}/leave/mine/${user._id}`),
+          axios.get(`${API}/users/${user._id}`),
+        ]);
+        setLeaves(leaveRes.data);
+        setLeaveCredits(userRes.data.leaveCredits || 0);
+      } catch (err) {
+        setError("Could not fetch leave history or user data.");
+      } finally {
         setLoading(false);
-      })
-      .catch(() => {
-        setError("Could not fetch leave history.");
-        setLoading(false);
-      });
-  }, []);
+      }
+    };
+
+    fetchData();
+  }, [user._id, refreshTrigger]);
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">

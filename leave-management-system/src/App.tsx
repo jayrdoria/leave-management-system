@@ -14,6 +14,8 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AdminUserManagement from "./pages/admin/AdminUserManagement";
 import AdminCalendar from "./pages/admin/AdminCalendar";
 import AdminManageLeaves from "./pages/admin/AdminManageLeaves";
+import AdminApplyLeave from "./pages/admin/AdminApplyLeave";
+import AdminLeaveControl from "./pages/admin/AdminLeaveControl";
 
 function App() {
   return (
@@ -32,6 +34,8 @@ function App() {
             <Route path="history" element={<LeaveHistory />} />
             <Route path="profile" element={<UserInfo />} />
             <Route path="user-management" element={<AdminUserManagement />} />
+            <Route path="apply-leave" element={<AdminApplyLeave />} />
+            <Route path="leave-control" element={<AdminLeaveControl />} />
           </Route>
 
           {/* Manager */}

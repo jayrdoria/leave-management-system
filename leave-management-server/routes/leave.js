@@ -124,7 +124,7 @@ router.get("/manager/leaves", authMiddleware, async (req, res) => {
 
     const leaves = await Leave.find({
       department: { $in: departments },
-    }).populate("userId", "name email leaveCredits");
+    }).populate("userId", "name email leaveCredits department");
 
     res.status(200).json(leaves);
   } catch (err) {
@@ -342,6 +342,76 @@ router.put("/admin/leave/:id", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Admin update leave error:", err);
     res.status(500).json({ msg: "Failed to update leave status." });
+  }
+});
+
+// POST /api/leave/admin-apply
+router.post("/admin-apply", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ msg: "Unauthorized" });
+    }
+
+    const {
+      userId,
+      type,
+      category,
+      duration, // "Half Day" or "Full Day"
+      startDate,
+      endDate,
+      reason,
+    } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const durationDays =
+      duration === "Half Day"
+        ? 0.5
+        : Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
+          1;
+
+    // ✅ Only deduct credits for these categories
+    const shouldDeduct = [
+      "Leave with Pay",
+      "Reduction of Overtime / Offset",
+      "Paternity Leave",
+      "Maternity Leave",
+    ].includes(category);
+
+    if (shouldDeduct && user.leaveCredits < durationDays) {
+      return res
+        .status(400)
+        .json({ msg: "Insufficient leave credits to apply for this leave." });
+    }
+
+    const newLeave = new Leave({
+      userId,
+      type,
+      category,
+      duration,
+      startDate,
+      endDate,
+      reason,
+      status: "Approved",
+      department: user.department,
+      approverId: req.user._id,
+      deductCredits: shouldDeduct, // ✅ Still stores Boolean
+    });
+
+    await newLeave.save();
+
+    if (shouldDeduct) {
+      user.leaveCredits -= durationDays;
+      await user.save();
+    }
+
+    res.status(201).json({ msg: "Leave filed and approved successfully" });
+  } catch (err) {
+    console.error("Admin apply leave error:", err);
+    res.status(500).json({ msg: "Error filing leave" });
   }
 });
 

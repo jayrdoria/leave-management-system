@@ -10,6 +10,8 @@ interface User {
   department: string;
   departmentScope: string[];
   leaveCredits: number;
+  country?: string;
+  sex?: string; // ✅ added
 }
 
 const DEPARTMENTS = [
@@ -21,6 +23,8 @@ const DEPARTMENTS = [
   "Marketing (CRM & Creative team)",
   "Operations & Analytics",
 ];
+
+const COUNTRIES = ["PH", "Malta"];
 
 const AdminUserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -49,17 +53,16 @@ const AdminUserManagement: React.FC = () => {
     setForm({ ...form, [name]: value });
   };
 
-  const handleScopeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedValues = Array.from(
-      e.target.selectedOptions,
-      (option) => option.value
-    );
-    setForm({ ...form, departmentScope: selectedValues });
-  };
-
   const handleSubmit = async () => {
     try {
-      if (!form.name || !form.email || !form.role || !form.department) {
+      if (
+        !form.name ||
+        !form.email ||
+        !form.role ||
+        !form.department ||
+        !form.country ||
+        !form.sex
+      ) {
         return toast.error("Please fill in all required fields");
       }
 
@@ -71,6 +74,8 @@ const AdminUserManagement: React.FC = () => {
           department: form.department,
           departmentScope: form.departmentScope || [],
           leaveCredits: form.leaveCredits,
+          country: form.country,
+          sex: form.sex, // ✅ added
         };
 
         if (form.password && form.password.trim() !== "") {
@@ -90,8 +95,10 @@ const AdminUserManagement: React.FC = () => {
           role: form.role,
           department: form.department,
           departmentScope: form.departmentScope || [],
-          leaveCredits: form.leaveCredits ?? 15, // default if not filled
+          leaveCredits: form.leaveCredits ?? 15,
           passwordHash: form.password,
+          country: form.country,
+          sex: form.sex, // ✅ added
         };
 
         await axios.post(`${API}/users`, newUserData);
@@ -172,6 +179,35 @@ const AdminUserManagement: React.FC = () => {
             </select>
           </div>
           <div>
+            <label className="text-sm text-gray-600">Country</label>
+            <select
+              name="country"
+              value={form.country || ""}
+              onChange={handleChange}
+              className="w-full mt-1 border rounded px-3 py-2 text-sm"
+            >
+              <option value="">Select Country</option>
+              {COUNTRIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm text-gray-600">Sex</label>
+            <select
+              name="sex"
+              value={form.sex || ""}
+              onChange={handleChange}
+              className="w-full mt-1 border rounded px-3 py-2 text-sm"
+            >
+              <option value="">Select Sex</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </div>
+          <div>
             <label className="text-sm text-gray-600">Department</label>
             <select
               name="department"
@@ -216,7 +252,6 @@ const AdminUserManagement: React.FC = () => {
               ))}
             </div>
           </div>
-
           <div>
             <label className="text-sm text-gray-600">Leave Credits</label>
             <input
@@ -228,7 +263,6 @@ const AdminUserManagement: React.FC = () => {
               placeholder="e.g. 15"
             />
           </div>
-
           <div>
             <label className="text-sm text-gray-600">
               Password {editingId ? "(optional)" : ""}
@@ -268,6 +302,7 @@ const AdminUserManagement: React.FC = () => {
               <th className="px-4 py-3">Department</th>
               <th className="px-4 py-3">Scope</th>
               <th className="px-4 py-3">Credits</th>
+              <th className="px-4 py-3">Sex</th>
               <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
@@ -295,6 +330,7 @@ const AdminUserManagement: React.FC = () => {
                   )}
                 </td>
                 <td className="px-4 py-3">{user.leaveCredits}</td>
+                <td className="px-4 py-3">{user.sex || "-"}</td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   <div className="flex justify-end gap-3">
                     <button
@@ -317,7 +353,7 @@ const AdminUserManagement: React.FC = () => {
             {users.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8} // ✅ updated colSpan to match new column count
                   className="px-4 py-6 text-center text-gray-500 italic"
                 >
                   No users found.

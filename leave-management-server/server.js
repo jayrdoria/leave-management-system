@@ -1,21 +1,12 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const https = require("https");
-const fs = require("fs");
 require("dotenv").config();
 
 const app = express();
 
-// ✅ Load SSL Certificate & Key (Only for HTTPS)
-const sslOptions = {
-  key: fs.readFileSync("/home/admin/conf/web/ssl.echowavedigital.com.key"),
-  cert: fs.readFileSync("/home/admin/conf/web/ssl.echowavedigital.com.crt"),
-  ca: fs.readFileSync("/home/admin/conf/web/ssl.echowavedigital.com.ca"),
-};
-
-// ✅ CORS setup
-const allowedOrigins = ["https://echowavedigital.com"];
+// ✅ CORS setup using environment variable
+const allowedOrigins = ["http://localhost:3000", "https://echowavedigital.com"];
 
 app.use(
   cors({
@@ -38,22 +29,21 @@ mongoose
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB error:", err));
 
-// ✅ API Routes
+// ✅ Routes
 const authRoutes = require("./routes/auth");
 const leaveRoutes = require("./routes/leave");
 const userRoutes = require("./routes/userRoutes");
 
+// ✅ Prefix all routes with /leave-system/api
 app.use("/leave-system/api/auth", authRoutes);
 app.use("/leave-system/api/leave", leaveRoutes);
 app.use("/leave-system/api/users", userRoutes);
 
-// ✅ 404 fallback
+// ✅ 404 fallback for undefined routes
 app.use((req, res) => {
   res.status(404).json({ msg: "Route not found" });
 });
 
-// ✅ Start HTTPS server
+// ✅ Start server
 const PORT = process.env.PORT || 5050;
-https.createServer(sslOptions, app).listen(PORT, () => {
-  console.log(`✅ HTTPS server running on https://echowavedigital.com:${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
