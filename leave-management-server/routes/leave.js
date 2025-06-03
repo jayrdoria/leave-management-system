@@ -3,6 +3,7 @@ const router = express.Router();
 const Leave = require("../models/Leave");
 const User = require("../models/User");
 const authMiddleware = require("../middleware/auth");
+const sendMail = require("../utils/mailer");
 
 // Apply for leave
 router.post("/apply", async (req, res) => {
@@ -50,6 +51,68 @@ router.post("/apply", async (req, res) => {
     });
 
     await newLeave.save();
+    // Get managers + admins in same department
+    const recipients = await User.find({
+      $or: [
+        { role: "admin" },
+        { role: "manager", department: user.department },
+      ],
+    }).select("email");
+
+    const emails = recipients.map((u) => u.email);
+
+    await sendMail(
+      emails,
+      `Leave Request from ${user.name}`,
+      `
+  <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 24px; border-radius: 8px; color: #333; max-width: 600px; margin: auto;">
+    <div style="text-align: center; margin-bottom: 20px;">
+      <img src="https://avatars.slack-edge.com/2023-01-27/4733489633024_675bb343be96883ef7b2_88.png" alt="Netovation Logo" style="width: 72px; height: 72px; border-radius: 50%;" />
+      <h2 style="margin-top: 12px;">New Leave Request</h2>
+    </div>
+
+    <p><strong>${user.name}</strong> has filed a leave request. Here are the details:</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin-top: 16px; margin-bottom: 24px;">
+      <tr>
+        <td style="padding: 8px; font-weight: bold;">Category:</td>
+        <td style="padding: 8px;">${category}</td>
+      </tr>
+      <tr style="background-color: #f0f0f0;">
+        <td style="padding: 8px; font-weight: bold;">Duration:</td>
+        <td style="padding: 8px;">${duration}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; font-weight: bold;">Start Date:</td>
+        <td style="padding: 8px;">${startDate}</td>
+      </tr>
+      <tr style="background-color: #f0f0f0;">
+        <td style="padding: 8px; font-weight: bold;">End Date:</td>
+        <td style="padding: 8px;">${endDate}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; font-weight: bold;">Reason:</td>
+        <td style="padding: 8px;">${reason}</td>
+      </tr>
+    </table>
+
+    <p style="margin-bottom: 32px;">
+      Kindly review this leave request. You can approve or reject it from your dashboard.
+    </p>
+
+    <div style="text-align: center;">
+      <a href="https://employee.netovation.eu/leave-system" style="background-color: #3b82f6; color: white; text-decoration: none; padding: 12px 20px; border-radius: 6px; font-weight: bold; display: inline-block;">
+        Go to Leave Dashboard
+      </a>
+    </div>
+
+    <p style="margin-top: 32px; font-size: 12px; color: #888888; text-align: center;">
+      This is an automated message from the Netovation Leave Management System.
+    </p>
+  </div>
+  `
+    );
+
     res.status(201).json({ msg: "Leave applied successfully" });
   } catch (err) {
     console.error("Apply leave error:", err);
@@ -137,6 +200,13 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
   try {
     const { status, comment } = req.body;
     const leaveId = req.params.id;
+    const formatDate = (dateStr) => {
+      return new Date(dateStr).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    };
 
     if (req.user.role !== "manager") {
       return res.status(403).json({ msg: "Access denied. Not a manager." });
@@ -207,6 +277,116 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
     }
 
     await leave.save();
+    if (status === "Approved") {
+      await sendMail(
+        user.email,
+        `Your Leave was Approved`,
+        `
+    <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 24px; border-radius: 8px; color: #333; max-width: 600px; margin: auto;">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <img src="https://avatars.slack-edge.com/2023-01-27/4733489633024_675bb343be96883ef7b2_88.png" alt="Netovation Logo" style="width: 72px; height: 72px; border-radius: 50%;" />
+        <h2 style="margin-top: 12px;">Leave Approved</h2>
+      </div>
+
+      <p>Hello ${user.name},</p>
+      <p>Your leave request has been <strong style="color: green;">Approved</strong> by <strong>${
+        req.user.name
+      }</strong>.</p>
+
+      <table style="width: 100%; border-collapse: collapse; margin-top: 16px; margin-bottom: 24px;">
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Start:</td>
+          <td style="padding: 8px;">${formatDate(leave.startDate)}
+</td>
+        </tr>
+        <tr style="background-color: #f0f0f0;">
+          <td style="padding: 8px; font-weight: bold;">End:</td>
+          <td style="padding: 8px;">${formatDate(leave.endDate)}
+</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Category:</td>
+          <td style="padding: 8px;">${leave.category}</td>
+        </tr>
+        <tr style="background-color: #f0f0f0;">
+          <td style="padding: 8px; font-weight: bold;">Duration:</td>
+          <td style="padding: 8px;">${leave.duration}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Reason:</td>
+          <td style="padding: 8px;">${leave.reason}</td>
+        </tr>
+        ${
+          comment
+            ? `
+        <tr style="background-color: #f0f0f0;">
+          <td style="padding: 8px; font-weight: bold;">Comment:</td>
+          <td style="padding: 8px;">${comment}</td>
+        </tr>`
+            : ""
+        }
+      </table>
+
+      <p style="font-size: 12px; text-align: center; color: #888;">This is an automated notification from the Netovation Leave System.</p>
+    </div>
+    `
+      );
+    } else if (status === "Rejected") {
+      await sendMail(
+        user.email,
+        `Your Leave was Rejected`,
+        `
+    <div style="font-family: Arial, sans-serif; background-color: #fff0f0; padding: 24px; border-radius: 8px; color: #333; max-width: 600px; margin: auto;">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <img src="https://avatars.slack-edge.com/2023-01-27/4733489633024_675bb343be96883ef7b2_88.png" alt="Netovation Logo" style="width: 72px; height: 72px; border-radius: 50%;" />
+        <h2 style="margin-top: 12px; color: #d32f2f;">Leave Rejected</h2>
+      </div>
+
+      <p>Hello ${user.name},</p>
+      <p>Your leave request has been <strong style="color: red;">Rejected</strong> by <strong>${
+        req.user.name
+      }</strong>.</p>
+
+      <table style="width: 100%; border-collapse: collapse; margin-top: 16px; margin-bottom: 24px;">
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Start:</td>
+          <td style="padding: 8px;">${formatDate(leave.startDate)}
+</td>
+        </tr>
+        <tr style="background-color: #f0f0f0;">
+          <td style="padding: 8px; font-weight: bold;">End:</td>
+          <td style="padding: 8px;">${formatDate(leave.endDate)}
+</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Category:</td>
+          <td style="padding: 8px;">${leave.category}</td>
+        </tr>
+        <tr style="background-color: #f0f0f0;">
+          <td style="padding: 8px; font-weight: bold;">Duration:</td>
+          <td style="padding: 8px;">${leave.duration}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Reason:</td>
+          <td style="padding: 8px;">${leave.reason}</td>
+        </tr>
+        ${
+          comment
+            ? `
+        <tr style="background-color: #f0f0f0;">
+          <td style="padding: 8px; font-weight: bold;">Comment:</td>
+          <td style="padding: 8px;">${comment}</td>
+        </tr>`
+            : ""
+        }
+      </table>
+
+      <p style="font-size: 12px; text-align: center; color: #888;">This is an automated notification from the Netovation Leave System.</p>
+    </div>
+    `
+      );
+    }
+
     res.status(200).json({ msg: `Leave updated to ${leave.status}.` });
   } catch (err) {
     console.error("Manager update error:", err);
@@ -292,6 +472,15 @@ router.put("/admin/leave/:id", authMiddleware, async (req, res) => {
     }
 
     const { status, comment } = req.body;
+
+    const formatDate = (dateStr) => {
+      return new Date(dateStr).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    };
+
     const leave = await Leave.findById(req.params.id);
     if (!leave) return res.status(404).json({ msg: "Leave not found" });
 
@@ -333,6 +522,67 @@ router.put("/admin/leave/:id", authMiddleware, async (req, res) => {
         user.leaveCredits -= deduction;
         await user.save();
       }
+
+      // ✅ Email Notification for Approved or Rejected
+      const decisionText = status === "Approved" ? "Approved" : "Rejected";
+      const bgColor = status === "Approved" ? "#f9f9f9" : "#fff0f0";
+      const textColor = status === "Approved" ? "green" : "red";
+      const headingColor = status === "Approved" ? "" : "#d32f2f";
+      const subject = `Your Leave was ${decisionText}`;
+
+      await sendMail(
+        user.email,
+        subject,
+        `
+    <div style="font-family: Arial, sans-serif; background-color: ${bgColor}; padding: 24px; border-radius: 8px; color: #333; max-width: 600px; margin: auto;">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <img src="https://avatars.slack-edge.com/2023-01-27/4733489633024_675bb343be96883ef7b2_88.png" alt="Netovation Logo" style="width: 72px; height: 72px; border-radius: 50%;" />
+        <h2 style="margin-top: 12px; ${
+          headingColor ? `color: ${headingColor};` : ""
+        }">Leave ${decisionText}</h2>
+      </div>
+
+      <p>Hello ${user.name},</p>
+      <p>Your leave request has been <strong style="color: ${textColor};">${decisionText}</strong> by <strong>${
+          req.user.name
+        }</strong>.</p>
+
+      <table style="width: 100%; border-collapse: collapse; margin-top: 16px; margin-bottom: 24px;">
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Start:</td>
+          <td style="padding: 8px;">${formatDate(leave.startDate)}</td>
+        </tr>
+        <tr style="background-color: #f0f0f0;">
+          <td style="padding: 8px; font-weight: bold;">End:</td>
+          <td style="padding: 8px;">${formatDate(leave.endDate)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Category:</td>
+          <td style="padding: 8px;">${leave.category}</td>
+        </tr>
+        <tr style="background-color: #f0f0f0;">
+          <td style="padding: 8px; font-weight: bold;">Duration:</td>
+          <td style="padding: 8px;">${leave.duration}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Reason:</td>
+          <td style="padding: 8px;">${leave.reason}</td>
+        </tr>
+        ${
+          comment
+            ? `
+        <tr style="background-color: #f0f0f0;">
+          <td style="padding: 8px; font-weight: bold;">Comment:</td>
+          <td style="padding: 8px;">${comment}</td>
+        </tr>`
+            : ""
+        }
+      </table>
+
+      <p style="font-size: 12px; text-align: center; color: #888; margin-top: 24px;">This is an automated notification from the Netovation Leave System.</p>
+    </div>
+    `
+      );
     } else {
       return res.status(400).json({ msg: "Invalid status." });
     }
@@ -364,6 +614,14 @@ router.post("/admin-apply", authMiddleware, async (req, res) => {
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ msg: "User not found" });
+
+    const formatDate = (dateStr) => {
+      return new Date(dateStr).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    };
 
     const start = new Date(startDate);
     const end = new Date(endDate);
@@ -406,6 +664,48 @@ router.post("/admin-apply", authMiddleware, async (req, res) => {
     if (shouldDeduct) {
       user.leaveCredits -= durationDays;
       await user.save();
+      await sendMail(
+        user.email,
+        `Your Leave was Approved`,
+        `
+  <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 24px; border-radius: 8px; color: #333; max-width: 600px; margin: auto;">
+    <div style="text-align: center; margin-bottom: 20px;">
+      <img src="https://avatars.slack-edge.com/2023-01-27/4733489633024_675bb343be96883ef7b2_88.png" alt="Netovation Logo" style="width: 72px; height: 72px; border-radius: 50%;" />
+      <h2 style="margin-top: 12px;">Leave Approved</h2>
+    </div>
+
+    <p>Hello ${user.name},</p>
+    <p>Your leave request has been <strong style="color: green;">Approved</strong> by <strong>${
+      req.user.name
+    }</strong>.</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin-top: 16px; margin-bottom: 24px;">
+      <tr>
+        <td style="padding: 8px; font-weight: bold;">Start:</td>
+        <td style="padding: 8px;">${formatDate(startDate)}</td>
+      </tr>
+      <tr style="background-color: #f0f0f0;">
+        <td style="padding: 8px; font-weight: bold;">End:</td>
+        <td style="padding: 8px;">${formatDate(endDate)}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; font-weight: bold;">Category:</td>
+        <td style="padding: 8px;">${category}</td>
+      </tr>
+      <tr style="background-color: #f0f0f0;">
+        <td style="padding: 8px; font-weight: bold;">Duration:</td>
+        <td style="padding: 8px;">${duration}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; font-weight: bold;">Reason:</td>
+        <td style="padding: 8px;">${reason}</td>
+      </tr>
+    </table>
+    
+    <p style="font-size: 12px; text-align: center; color: #888; margin-top: 24px;">This is an automated notification from the Netovation Leave System.</p>
+  </div>
+  `
+      );
     }
 
     res.status(201).json({ msg: "Leave filed and approved successfully" });
