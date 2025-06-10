@@ -107,7 +107,6 @@ const AdminApplyLeave = () => {
             <option value="Reduction of Overtime / Offset">
               Reduction of Overtime / Offset
             </option>
-            <option value="Birthday Leave">Birthday Leave</option>
             {selectedUserObj?.sex === "Male" && (
               <option value="Paternity Leave">Paternity Leave</option>
             )}

@@ -51,6 +51,8 @@ router.post("/apply", async (req, res) => {
     });
 
     await newLeave.save();
+
+    res.status(201).json({ msg: "Leave applied successfully" });
     // Get managers + admins in same department
     const recipients = await User.find({
       $or: [
@@ -61,7 +63,7 @@ router.post("/apply", async (req, res) => {
 
     const emails = recipients.map((u) => u.email);
 
-    await sendMail(
+    sendMail(
       emails,
       `Leave Request from ${user.name}`,
       `
@@ -112,8 +114,6 @@ router.post("/apply", async (req, res) => {
   </div>
   `
     );
-
-    res.status(201).json({ msg: "Leave applied successfully" });
   } catch (err) {
     console.error("Apply leave error:", err);
     res.status(500).json({ msg: "Error applying for leave" });
@@ -277,8 +277,9 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
     }
 
     await leave.save();
+    res.status(200).json({ msg: `Leave updated to ${leave.status}.` });
     if (status === "Approved") {
-      await sendMail(
+      sendMail(
         user.email,
         `Your Leave was Approved`,
         `
@@ -332,7 +333,7 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
     `
       );
     } else if (status === "Rejected") {
-      await sendMail(
+      sendMail(
         user.email,
         `Your Leave was Rejected`,
         `
@@ -386,8 +387,6 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
     `
       );
     }
-
-    res.status(200).json({ msg: `Leave updated to ${leave.status}.` });
   } catch (err) {
     console.error("Manager update error:", err);
     res.status(500).json({ msg: "Error updating leave status." });
@@ -530,7 +529,7 @@ router.put("/admin/leave/:id", authMiddleware, async (req, res) => {
       const headingColor = status === "Approved" ? "" : "#d32f2f";
       const subject = `Your Leave was ${decisionText}`;
 
-      await sendMail(
+      sendMail(
         user.email,
         subject,
         `
@@ -664,7 +663,7 @@ router.post("/admin-apply", authMiddleware, async (req, res) => {
     if (shouldDeduct) {
       user.leaveCredits -= durationDays;
       await user.save();
-      await sendMail(
+      sendMail(
         user.email,
         `Your Leave was Approved`,
         `
