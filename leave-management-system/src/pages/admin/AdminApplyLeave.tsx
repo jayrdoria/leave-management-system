@@ -113,6 +113,7 @@ const AdminApplyLeave = () => {
             {selectedUserObj?.sex === "Female" && (
               <option value="Maternity Leave">Maternity Leave</option>
             )}
+            <option value="Sickness Leave">Sickness Leave</option>
           </select>
         </div>
 

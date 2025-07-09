@@ -47,8 +47,6 @@ const LeaveForm: React.FC<LeaveFormProps> = ({
     const deductCredits = [
       "Leave with Pay",
       "Reduction of Overtime / Offset",
-      "Paternity Leave",
-      "Maternity Leave",
     ].includes(category);
 
     try {
@@ -107,12 +105,6 @@ const LeaveForm: React.FC<LeaveFormProps> = ({
             <option value="Reduction of Overtime / Offset">
               Reduction of Overtime / Offset
             </option>
-            {user?.sex === "Male" && (
-              <option value="Paternity Leave">Paternity Leave</option>
-            )}
-            {user?.sex === "Female" && (
-              <option value="Maternity Leave">Maternity Leave</option>
-            )}
           </select>
         </div>
         <div>

@@ -16,8 +16,8 @@ const DashboardLayout = ({ role }: Props) => {
       { label: "Leave History", path: "/admin/history" },
       { label: "User Info", path: "/admin/profile" },
       { label: "Admin Apply Leave", path: "/admin/apply-leave" },
-      { label: "Admin Leave Control", path: "/admin/leave-control" },
       { label: "User Management", path: "/admin/user-management" },
+      { label: "Manual Leave Credit", path: "/admin/manual-leave-credit" },
     ],
     manager: [
       { label: "Dashboard", path: "/manager" },
@@ -67,7 +67,7 @@ const DashboardLayout = ({ role }: Props) => {
                   role !== "admin" ||
                   (link.label !== "Admin Apply Leave" &&
                     link.label !== "User Management" &&
-                    link.label !== "Admin Leave Control")
+                    link.label !== "Manual Leave Credit")
               )
               .map((link) => (
                 <button
@@ -91,7 +91,7 @@ const DashboardLayout = ({ role }: Props) => {
                     (link) =>
                       link.label === "Admin Apply Leave" ||
                       link.label === "User Management" ||
-                      link.label === "Admin Leave Control"
+                      link.label === "Manual Leave Credit"
                   )
                   .map((link) => (
                     <button

@@ -635,7 +635,6 @@ router.post("/admin-apply", authMiddleware, async (req, res) => {
       "Leave with Pay",
       "Reduction of Overtime / Offset",
       "Paternity Leave",
-      "Maternity Leave",
     ].includes(category);
 
     if (shouldDeduct && user.leaveCredits < durationDays) {

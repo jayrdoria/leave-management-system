@@ -144,6 +144,44 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// ✅ MANUAL CREDIT (NEW)
+router.post("/manual-credit", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ msg: "Unauthorized" });
+    }
+
+    const { userId, amount, description } = req.body;
+
+    if (!userId || amount === undefined) {
+      return res.status(400).json({ msg: "Missing required fields" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    user.leaveCredits += Number(amount);
+    await user.save();
+
+    await LeaveActionLog.create({
+      action: "Manual Credit",
+      performedBy: req.user.name,
+      user: user.name,
+      userId: user._id,
+      amount: Number(amount),
+      description: description || "",
+      timestamp: new Date(),
+    });
+
+    res
+      .status(200)
+      .json({ msg: `Added ${amount} leave credits to ${user.name}` });
+  } catch (err) {
+    console.error("Manual credit error:", err);
+    res.status(500).json({ msg: "Failed to apply manual credit" });
+  }
+});
+
 // ✅ RESET LEAVES
 router.post("/reset-leaves", authMiddleware, async (req, res) => {
   try {

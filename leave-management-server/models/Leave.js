@@ -16,6 +16,7 @@ const leaveSchema = new mongoose.Schema(
         "Birthday Leave",
         "Paternity Leave",
         "Maternity Leave", // ✅ add these
+        "Sickness Leave",
       ],
       required: true,
     },

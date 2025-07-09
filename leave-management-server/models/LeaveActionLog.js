@@ -1,9 +1,12 @@
-// models/LeaveActionLog.js
 const mongoose = require("mongoose");
 
 const leaveActionLogSchema = new mongoose.Schema({
-  action: { type: String, required: true }, // e.g., "Reset", "Add"
-  performedBy: { type: String, required: true }, // name or ID of admin
+  action: { type: String, required: true }, // e.g. "Manual Credit"
+  performedBy: { type: String, required: true }, // admin name
+  user: { type: String, required: true }, // employee name
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  amount: { type: Number, required: true },
+  description: { type: String },
   timestamp: { type: Date, default: Date.now },
 });
 
