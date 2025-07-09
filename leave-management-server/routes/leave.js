@@ -5,6 +5,13 @@ const User = require("../models/User");
 const authMiddleware = require("../middleware/auth");
 const sendMail = require("../utils/mailer");
 
+// ✅ Add this below your other requires
+const {
+  getUsableCredits,
+  deductLeaveCredits,
+  restoreLeaveCredits,
+} = require("../utils/leaveCredits");
+
 // Apply for leave
 router.post("/apply", async (req, res) => {
   try {
@@ -32,10 +39,11 @@ router.post("/apply", async (req, res) => {
               (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
             ) + 1;
 
-      if (user.leaveCredits < durationDays) {
-        return res
-          .status(400)
-          .json({ msg: "Insufficient leave credits to apply for this leave." });
+      const usable = getUsableCredits(user);
+      if (usable < durationDays) {
+        return res.status(400).json({
+          msg: `Insufficient leave credits. You have ${usable}, but ${durationDays} required.`,
+        });
       }
     }
 
@@ -217,7 +225,11 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
       return res.status(404).json({ msg: "Leave not found." });
     }
 
-    if (leave.department !== req.user.department) {
+    // Allow managers to approve their own leaves
+    if (
+      leave.department !== req.user.department &&
+      leave.userId.toString() !== req.user.id
+    ) {
       return res
         .status(403)
         .json({ msg: "Not authorized for this department." });
@@ -237,7 +249,9 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
         const days = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)) + 1;
 
         const refund = leave.duration === "Half Day" ? 0.5 : days;
-        user.leaveCredits += refund;
+        const updatedHistory = restoreLeaveCredits(user, refund, new Date());
+        user.leaveCreditHistory = updatedHistory;
+        // 🔴 This will be replaced in next step (Phase 3 refund logic)
         await user.save();
       }
 
@@ -265,12 +279,15 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
           deduction = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)) + 1;
         }
 
-        if (user.leaveCredits < deduction) {
-          return res.status(400).json({ msg: "Insufficient leave credits." });
+        try {
+          const updatedHistory = deductLeaveCredits(user, deduction);
+          user.leaveCreditHistory = updatedHistory;
+          await user.save();
+        } catch (err) {
+          return res.status(400).json({
+            msg: "Insufficient valid leave credits to approve this request.",
+          });
         }
-
-        user.leaveCredits -= deduction;
-        await user.save();
       }
     } else {
       return res.status(400).json({ msg: "Invalid status." });
@@ -278,6 +295,7 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
 
     await leave.save();
     res.status(200).json({ msg: `Leave updated to ${leave.status}.` });
+
     if (status === "Approved") {
       sendMail(
         user.email,
@@ -421,17 +439,28 @@ router.delete("/:id", authMiddleware, async (req, res) => {
         .json({ msg: "You are not allowed to delete this leave." });
     }
 
-    // ✅ Refund credits if approved + deductCredits is true
     if (leave.status === "Approved" && leave.deductCredits) {
       const user = await User.findById(leave.userId);
       if (user) {
-        const start = new Date(leave.startDate);
-        const end = new Date(leave.endDate);
-        const timeDiff = end.getTime() - start.getTime();
-        const days = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)) + 1;
+        let refund = 1;
 
-        const refund = leave.duration === "Half Day" ? 0.5 : days;
-        user.leaveCredits += refund;
+        if (leave.duration === "Half Day") {
+          refund = 0.5;
+        } else {
+          const start = new Date(leave.startDate);
+          const end = new Date(leave.endDate);
+          const timeDiff = end.getTime() - start.getTime();
+          refund = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)) + 1;
+        }
+
+        // ⛳ Use the correct expiry date logic (based on leave.createdAt)
+        const updatedHistory = restoreLeaveCredits(
+          user,
+          refund,
+          leave.createdAt
+        );
+        user.leaveCreditHistory = updatedHistory;
+
         await user.save();
       }
     }

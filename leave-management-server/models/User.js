@@ -1,5 +1,14 @@
 const mongoose = require("mongoose");
 
+const leaveCreditEntrySchema = new mongoose.Schema(
+  {
+    amount: { type: Number, required: true },
+    dateAdded: { type: Date, required: true },
+    expiresOn: { type: Date, required: true },
+  },
+  { _id: false } // don't auto-create _id for subdocuments
+);
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
@@ -15,10 +24,19 @@ const userSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
-    leaveCredits: {
-      type: Number,
-      default: 15, // default for all new users
+
+    // ✅ REPLACEMENT STRUCTURE
+    leaveCreditHistory: {
+      type: [leaveCreditEntrySchema],
+      default: [],
     },
+
+    // 🔥 REMOVE this after migration
+    // leaveCredits: {
+    //   type: Number,
+    //   default: 15,
+    // },
+
     country: {
       type: String,
       enum: ["PH", "Malta"],
