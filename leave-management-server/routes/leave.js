@@ -208,22 +208,13 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
   try {
     const { status, comment } = req.body;
     const leaveId = req.params.id;
-    const formatDate = (dateStr) => {
-      return new Date(dateStr).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-    };
 
     if (req.user.role !== "manager") {
       return res.status(403).json({ msg: "Access denied. Not a manager." });
     }
 
     const leave = await Leave.findById(leaveId);
-    if (!leave) {
-      return res.status(404).json({ msg: "Leave not found." });
-    }
+    if (!leave) return res.status(404).json({ msg: "Leave not found." });
 
     // Allow managers to approve their own leaves
     if (
@@ -236,23 +227,29 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
     }
 
     const user = await User.findById(leave.userId);
-    if (!user) {
-      return res.status(404).json({ msg: "Leave owner not found." });
-    }
+    if (!user) return res.status(404).json({ msg: "Leave owner not found." });
 
-    // ✅ Cancel Approval
+    // Helper: calculate leave duration
+    const start = new Date(leave.startDate);
+    const end = new Date(leave.endDate);
+    const days =
+      leave.duration === "Half Day"
+        ? 0.5
+        : Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
+          1;
+
+    // ✅ Cancel Approval – Restore credits
     if (status === "Pending") {
-      if (leave.status === "Approved" && leave.deductCredits) {
-        const start = new Date(leave.startDate);
-        const end = new Date(leave.endDate);
-        const timeDiff = end.getTime() - start.getTime();
-        const days = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)) + 1;
-
-        const refund = leave.duration === "Half Day" ? 0.5 : days;
-        const updatedHistory = restoreLeaveCredits(user, refund, new Date());
+      if (
+        leave.status === "Approved" &&
+        leave.deductCredits &&
+        leave.deductedFrom?.length
+      ) {
+        const updatedHistory = restoreLeaveCredits(user, leave.deductedFrom);
         user.leaveCreditHistory = updatedHistory;
-        // 🔴 This will be replaced in next step (Phase 3 refund logic)
         await user.save();
+
+        leave.deductedFrom = []; // clear trace
       }
 
       leave.status = "Pending";
@@ -266,28 +263,25 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
       leave.comment = comment || "";
       leave.approverId = req.user.id;
 
-      // ✅ Deduct leave credits only if approved and marked to deduct
       if (status === "Approved" && leave.deductCredits) {
-        let deduction = 1;
-
-        if (leave.duration === "Half Day") {
-          deduction = 0.5;
-        } else {
-          const start = new Date(leave.startDate);
-          const end = new Date(leave.endDate);
-          const timeDiff = end.getTime() - start.getTime();
-          deduction = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)) + 1;
-        }
-
         try {
-          const updatedHistory = deductLeaveCredits(user, deduction);
+          const { updatedHistory, deductedFrom } = deductLeaveCredits(
+            user,
+            days
+          );
           user.leaveCreditHistory = updatedHistory;
           await user.save();
+
+          leave.deductedFrom = deductedFrom;
         } catch (err) {
           return res.status(400).json({
             msg: "Insufficient valid leave credits to approve this request.",
           });
         }
+      }
+
+      if (status === "Rejected") {
+        leave.deductedFrom = []; // Clear any previous trace
       }
     } else {
       return res.status(400).json({ msg: "Invalid status." });
@@ -428,10 +422,8 @@ router.delete("/:id", authMiddleware, async (req, res) => {
       leave.status
     );
 
-    // ✅ Correct logic:
     const canDelete =
-      (isOwner && isPending) || // Owner (employee/manager) cancels their pending leave
-      (isManagerOrAdmin && isApprovedOrRejected); // Manager/Admin deletes any approved/rejected leave
+      (isOwner && isPending) || (isManagerOrAdmin && isApprovedOrRejected);
 
     if (!canDelete) {
       return res
@@ -439,28 +431,16 @@ router.delete("/:id", authMiddleware, async (req, res) => {
         .json({ msg: "You are not allowed to delete this leave." });
     }
 
-    if (leave.status === "Approved" && leave.deductCredits) {
+    // ✅ Phase 3 refund: use deductedFrom
+    if (
+      leave.status === "Approved" &&
+      leave.deductCredits &&
+      leave.deductedFrom?.length
+    ) {
       const user = await User.findById(leave.userId);
       if (user) {
-        let refund = 1;
-
-        if (leave.duration === "Half Day") {
-          refund = 0.5;
-        } else {
-          const start = new Date(leave.startDate);
-          const end = new Date(leave.endDate);
-          const timeDiff = end.getTime() - start.getTime();
-          refund = Math.ceil(timeDiff / (1000 * 60 * 60 * 24)) + 1;
-        }
-
-        // ⛳ Use the correct expiry date logic (based on leave.createdAt)
-        const updatedHistory = restoreLeaveCredits(
-          user,
-          refund,
-          leave.createdAt
-        );
+        const updatedHistory = restoreLeaveCredits(user, leave.deductedFrom);
         user.leaveCreditHistory = updatedHistory;
-
         await user.save();
       }
     }
@@ -515,43 +495,60 @@ router.put("/admin/leave/:id", authMiddleware, async (req, res) => {
     const user = await User.findById(leave.userId);
     if (!user) return res.status(404).json({ msg: "User not found" });
 
-    if (status === "Pending") {
-      if (leave.status === "Approved" && leave.deductCredits) {
-        const start = new Date(leave.startDate);
-        const end = new Date(leave.endDate);
-        const days =
-          Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
+    const start = new Date(leave.startDate);
+    const end = new Date(leave.endDate);
+    const days =
+      leave.duration === "Half Day"
+        ? 0.5
+        : Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
           1;
-        const refund = leave.duration === "Half Day" ? 0.5 : days;
-        user.leaveCredits += refund;
+
+    if (status === "Pending") {
+      // Refund only if previously approved and deductCredits
+      if (
+        leave.status === "Approved" &&
+        leave.deductCredits &&
+        leave.deductedFrom?.length
+      ) {
+        user.leaveCreditHistory = restoreLeaveCredits(user, leave.deductedFrom);
+        leave.deductedFrom = [];
         await user.save();
       }
 
       leave.status = "Pending";
       leave.comment = "";
       leave.approverId = undefined;
-    } else if (["Approved", "Rejected"].includes(status)) {
-      leave.status = status;
+    }
+
+    if (status === "Approved") {
+      leave.status = "Approved";
       leave.comment = comment || "";
       leave.approverId = req.user._id;
 
-      if (status === "Approved" && leave.deductCredits) {
-        const start = new Date(leave.startDate);
-        const end = new Date(leave.endDate);
-        const days =
-          Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
-          1;
-        const deduction = leave.duration === "Half Day" ? 0.5 : days;
-
-        if (user.leaveCredits < deduction) {
-          return res.status(400).json({ msg: "Insufficient leave credits." });
+      if (leave.deductCredits) {
+        const usable = getUsableCredits(user);
+        if (usable < days) {
+          return res.status(400).json({
+            msg: `Insufficient leave credits. You have ${usable}, but ${days} required.`,
+          });
         }
 
-        user.leaveCredits -= deduction;
+        const { updatedHistory, deductedFrom } = deductLeaveCredits(user, days);
+        user.leaveCreditHistory = updatedHistory;
+        leave.deductedFrom = deductedFrom;
         await user.save();
       }
+    }
 
-      // ✅ Email Notification for Approved or Rejected
+    if (status === "Rejected") {
+      leave.status = "Rejected";
+      leave.comment = comment || "";
+      leave.approverId = req.user._id;
+      leave.deductedFrom = []; // Just to be safe, clear any trace
+    }
+
+    // ✅ Send email after change
+    if (["Approved", "Rejected"].includes(status)) {
       const decisionText = status === "Approved" ? "Approved" : "Rejected";
       const bgColor = status === "Approved" ? "#f9f9f9" : "#fff0f0";
       const textColor = status === "Approved" ? "green" : "red";
@@ -611,8 +608,6 @@ router.put("/admin/leave/:id", authMiddleware, async (req, res) => {
     </div>
     `
       );
-    } else {
-      return res.status(400).json({ msg: "Invalid status." });
     }
 
     await leave.save();
@@ -643,14 +638,6 @@ router.post("/admin-apply", authMiddleware, async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ msg: "User not found" });
 
-    const formatDate = (dateStr) => {
-      return new Date(dateStr).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-    };
-
     const start = new Date(startDate);
     const end = new Date(endDate);
     const durationDays =
@@ -666,12 +653,17 @@ router.post("/admin-apply", authMiddleware, async (req, res) => {
       "Paternity Leave",
     ].includes(category);
 
-    if (shouldDeduct && user.leaveCredits < durationDays) {
-      return res
-        .status(400)
-        .json({ msg: "Insufficient leave credits to apply for this leave." });
+    // ✅ Check if sufficient usable credits exist
+    if (shouldDeduct) {
+      const usable = getUsableCredits(user);
+      if (usable < durationDays) {
+        return res.status(400).json({
+          msg: `Insufficient leave credits. You have ${usable}, but ${durationDays} required.`,
+        });
+      }
     }
 
+    // ✅ Prepare the leave
     const newLeave = new Leave({
       userId,
       type,
@@ -683,18 +675,42 @@ router.post("/admin-apply", authMiddleware, async (req, res) => {
       status: "Approved",
       department: user.department,
       approverId: req.user._id,
-      deductCredits: shouldDeduct, // ✅ Still stores Boolean
+      deductCredits: shouldDeduct,
     });
+
+    // ✅ Deduct if required
+    if (shouldDeduct) {
+      try {
+        const { updatedHistory, deductedFrom } = deductLeaveCredits(
+          user,
+          durationDays
+        );
+        user.leaveCreditHistory = updatedHistory;
+        newLeave.deductedFrom = deductedFrom;
+        await user.save();
+      } catch (err) {
+        return res.status(400).json({
+          msg: "Failed to deduct leave credits. Please check credit history.",
+        });
+      }
+    }
 
     await newLeave.save();
 
+    // ✅ Send email but don't let it block the response
     if (shouldDeduct) {
-      user.leaveCredits -= durationDays;
-      await user.save();
-      sendMail(
-        user.email,
-        `Your Leave was Approved`,
-        `
+      try {
+        const formatDate = (dateStr) =>
+          new Date(dateStr).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          });
+
+        sendMail(
+          user.email,
+          `Your Leave was Approved`,
+          `
   <div style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 24px; border-radius: 8px; color: #333; max-width: 600px; margin: auto;">
     <div style="text-align: center; margin-bottom: 20px;">
       <img src="https://avatars.slack-edge.com/2023-01-27/4733489633024_675bb343be96883ef7b2_88.png" alt="Netovation Logo" style="width: 72px; height: 72px; border-radius: 50%;" />
@@ -732,7 +748,10 @@ router.post("/admin-apply", authMiddleware, async (req, res) => {
     <p style="font-size: 12px; text-align: center; color: #888; margin-top: 24px;">This is an automated notification from the Netovation Leave System.</p>
   </div>
   `
-      );
+        );
+      } catch (emailErr) {
+        console.error("📧 Email send error (ignored):", emailErr.message);
+      }
     }
 
     res.status(201).json({ msg: "Leave filed and approved successfully" });

@@ -15,7 +15,7 @@ const leaveSchema = new mongoose.Schema(
         "Reduction of Overtime / Offset",
         "Birthday Leave",
         "Paternity Leave",
-        "Maternity Leave", // ✅ add these
+        "Maternity Leave",
         "Sickness Leave",
       ],
       required: true,
@@ -26,6 +26,18 @@ const leaveSchema = new mongoose.Schema(
       default: "Full Day",
     },
     deductCredits: { type: Boolean, default: false },
+
+    // ✅ NEW FIELD for Phase 3
+    deductedFrom: {
+      type: [
+        {
+          expiryDate: { type: Date, required: true },
+          amount: { type: Number, required: true },
+        },
+      ],
+      _id: false,
+    },
+
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
     reason: { type: String },

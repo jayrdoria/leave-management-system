@@ -3,9 +3,7 @@ const mongoose = require("mongoose");
 const User = require("./models/User");
 
 const resetLeaveCredits = async () => {
-  await mongoose.connect(
-    "mongodb+srv://admin:Smtp123!@leave-cluster.0gjlml7.mongodb.net/leave-management"
-  );
+  await mongoose.connect("");
 
   const users = await User.find({});
 
