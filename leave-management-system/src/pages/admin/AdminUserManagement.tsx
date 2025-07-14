@@ -9,7 +9,7 @@ interface User {
   role: string;
   department: string;
   departmentScope: string[];
-  leaveCredits: number;
+  leaveCreditHistory?: { amount: number; expiresOn: string }[];
   country?: string;
   sex?: string; // ✅ added
 }
@@ -73,7 +73,12 @@ const AdminUserManagement: React.FC = () => {
           role: form.role,
           department: form.department,
           departmentScope: form.departmentScope || [],
-          leaveCredits: form.leaveCredits,
+          leaveCreditHistory: (form.leaveCreditHistory || []).map((entry) => ({
+            amount: Number(entry.amount),
+            expiresOn: new Date(entry.expiresOn),
+            dateAdded: new Date(), // or preserve the original date if available
+          })),
+
           country: form.country,
           sex: form.sex, // ✅ added
         };
@@ -95,7 +100,12 @@ const AdminUserManagement: React.FC = () => {
           role: form.role,
           department: form.department,
           departmentScope: form.departmentScope || [],
-          leaveCredits: form.leaveCredits ?? 15,
+          leaveCreditHistory: (form.leaveCreditHistory || []).map((entry) => ({
+            amount: Number(entry.amount),
+            expiresOn: new Date(entry.expiresOn),
+            dateAdded: new Date(), // you can adjust this if needed
+          })),
+
           passwordHash: form.password,
           country: form.country,
           sex: form.sex, // ✅ added
@@ -253,16 +263,45 @@ const AdminUserManagement: React.FC = () => {
             </div>
           </div>
           <div>
-            <label className="text-sm text-gray-600">Leave Credits</label>
-            <input
-              type="number"
-              name="leaveCredits"
-              value={form.leaveCredits ?? ""}
-              onChange={handleChange}
-              className="w-full mt-1 border rounded px-3 py-2 text-sm"
-              placeholder="e.g. 15"
-            />
+            <label className="text-sm text-gray-600">
+              Leave Credits per Year
+            </label>
+            {[new Date().getFullYear(), new Date().getFullYear() + 1].map(
+              (year) => {
+                const existing = form.leaveCreditHistory?.find(
+                  (c) => new Date(c.expiresOn).getFullYear() === year
+                );
+                return (
+                  <div key={year} className="flex items-center gap-2 mt-1">
+                    <span className="text-sm w-14">{year}</span>
+                    <input
+                      type="number"
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      placeholder="e.g. 15"
+                      value={existing?.amount ?? ""}
+                      onChange={(e) => {
+                        const newAmount = parseFloat(e.target.value || "0");
+                        const updated = [...(form.leaveCreditHistory || [])];
+                        const index = updated.findIndex(
+                          (c) => new Date(c.expiresOn).getFullYear() === year
+                        );
+                        const expiresOn = `${year}-12-31`;
+
+                        if (index !== -1) {
+                          updated[index].amount = newAmount;
+                        } else {
+                          updated.push({ amount: newAmount, expiresOn });
+                        }
+
+                        setForm({ ...form, leaveCreditHistory: updated });
+                      }}
+                    />
+                  </div>
+                );
+              }
+            )}
           </div>
+
           <div>
             <label className="text-sm text-gray-600">
               Password {editingId ? "(optional)" : ""}
@@ -329,7 +368,14 @@ const AdminUserManagement: React.FC = () => {
                     <span className="text-xs text-gray-400 italic">None</span>
                   )}
                 </td>
-                <td className="px-4 py-3">{user.leaveCredits}</td>
+                <td className="px-4 py-3">
+                  {user.leaveCreditHistory
+                    ? user.leaveCreditHistory
+                        .filter((c) => new Date(c.expiresOn) >= new Date())
+                        .reduce((sum, c) => sum + c.amount, 0)
+                    : 0}
+                </td>
+
                 <td className="px-4 py-3">{user.sex || "-"}</td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   <div className="flex justify-end gap-3">

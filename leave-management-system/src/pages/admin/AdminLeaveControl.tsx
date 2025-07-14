@@ -1,234 +1,161 @@
-import React, { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
-import toast from "react-hot-toast";
+import { toast } from "react-hot-toast";
+
+const API = process.env.REACT_APP_API_BASE_URL;
 
 interface LogEntry {
   _id: string;
-  action: string;
+  user: string;
+  amount: number;
+  country?: string;
   performedBy: string;
   timestamp: string;
-}
-
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-  sex: string;
+  action: string;
+  description?: string;
 }
 
 const AdminLeaveControl = () => {
-  const [loading, setLoading] = useState(false);
+  const [lastGrantTimestamp, setLastGrantTimestamp] = useState<string | null>(
+    null
+  );
+  const [showReset, setShowReset] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState("");
-  const selectedUser = users.find((u) => u._id === selectedUserId);
-  const API = process.env.REACT_APP_API_BASE_URL;
-  const token = localStorage.getItem("token");
 
   useEffect(() => {
     fetchLogs();
-    fetchUsers();
   }, []);
 
   const fetchLogs = async () => {
     try {
       const res = await axios.get(`${API}/users/leave-action-logs`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       });
-      setLogs(res.data);
+
+      const yearlyLogs = res.data.filter(
+        (log: LogEntry) => log.action === "Yearly Credit"
+      );
+
+      setLogs(yearlyLogs);
+      if (yearlyLogs.length > 0) {
+        setLastGrantTimestamp(yearlyLogs[0].timestamp);
+        const now = new Date().getTime();
+        const last = new Date(yearlyLogs[0].timestamp).getTime();
+        const hoursSince = (now - last) / (1000 * 60 * 60);
+        setShowReset(hoursSince <= 24);
+      }
     } catch (err) {
-      console.error("Failed to fetch logs:", err);
+      toast.error("Failed to load logs");
+      console.error(err);
     }
   };
 
-  const fetchUsers = async () => {
+  const handleGrantCredits = async () => {
     try {
-      const res = await axios.get(`${API}/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setUsers(res.data);
-    } catch (err) {
-      console.error("Failed to fetch users:", err);
-    }
-  };
-
-  const handleResetLeaves = async () => {
-    if (
-      !window.confirm("Are you sure you want to reset all leave credits to 0?")
-    )
-      return;
-    try {
-      setLoading(true);
-      await axios.post(
-        `${API}/users/reset-leaves`,
+      const res = await axios.post(
+        `${API}/users/yearly-credits`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
       );
-      toast.success("All leave credits have been reset to 0");
+      toast.success("Yearly credits granted!");
+      setLastGrantTimestamp(res.data.timestamp);
       fetchLogs();
     } catch (err) {
-      console.error("Reset error:", err);
-      toast.error("Failed to reset leave credits");
-    } finally {
-      setLoading(false);
+      toast.error("Granting failed");
+      console.error(err);
     }
   };
 
-  const handleAddStandardLeaves = async () => {
-    if (!window.confirm("Add standard leave credits based on country?")) return;
+  const handleReset = async () => {
     try {
-      setLoading(true);
-      await axios.post(
-        `${API}/users/add-standard-leaves`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
+      const res = await axios.post(
+        `${API}/users/reset-yearly-credits`,
+        { timestamp: lastGrantTimestamp },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
       );
-      toast.success("Standard leave credits added based on country");
+      toast.success("Reset successful");
+      setShowReset(false);
       fetchLogs();
     } catch (err) {
-      console.error("Add standard error:", err);
-      toast.error("Failed to add standard leave credits");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddParentLeave = async () => {
-    if (!selectedUserId) return toast.error("Please select a user");
-    try {
-      setLoading(true);
-      await axios.post(
-        `${API}/users/add-parent-leave`,
-        { userId: selectedUserId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      toast.success("Parent leave credits added successfully");
-      fetchLogs();
-    } catch (err) {
-      console.error("Add parent leave error:", err);
-      toast.error("Failed to add parent leave");
-    } finally {
-      setLoading(false);
+      toast.error("Reset failed");
+      console.error(err);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">
-        Admin Panel – Leave Expiry Control
-      </h1>
+    <div className="max-w-5xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-4">🛠 Admin Yearly Leave Control</h1>
 
-      <div className="bg-white shadow rounded-lg p-6 space-y-6">
-        <p className="text-sm text-gray-600">
-          Use these actions to manage leave credit expiration and annual
-          standard allocations based on user country and parental status.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <button
+          onClick={handleGrantCredits}
+          className="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700"
+        >
+          Add Yearly Credits
+        </button>
 
-        <div className="flex flex-col sm:flex-row gap-4">
+        {showReset && (
           <button
-            onClick={handleResetLeaves}
-            disabled={loading}
-            className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded text-sm font-semibold disabled:opacity-50"
+            onClick={handleReset}
+            className="bg-red-600 text-white px-6 py-3 rounded hover:bg-red-700"
           >
-            {loading ? "Processing..." : "Reset All Leaves to 0"}
+            Reset Credits (within 24h)
           </button>
-
-          <button
-            onClick={handleAddStandardLeaves}
-            disabled={loading}
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded text-sm font-semibold disabled:opacity-50"
-          >
-            {loading
-              ? "Processing..."
-              : "Add Standard Leaves (PH: 15 | Malta: 24)"}
-          </button>
-        </div>
-
-        {/* Parent Leave Section */}
-        <div className="border-t pt-6 mt-6">
-          <h2 className="text-lg font-semibold mb-2">
-            Add Paternity / Maternity Leave (Individual)
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
-            <select
-              value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
-              className="px-3 py-2 border rounded shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">-- Select Employee --</option>
-              {users.map((u) => (
-                <option key={u._id} value={u._id}>
-                  {u.name} ({u.email}) - {u.sex}
-                </option>
-              ))}
-            </select>
-
-            <div className="text-sm text-gray-700">
-              {selectedUser && (
-                <p>
-                  Selected:{" "}
-                  <span className="font-medium">
-                    {selectedUser.sex === "Male"
-                      ? "Male (10 Paternity)"
-                      : "Female (45 Maternity)"}
-                  </span>
-                </p>
-              )}
-            </div>
-
-            <button
-              onClick={handleAddParentLeave}
-              disabled={!selectedUserId || loading}
-              className={`px-4 py-2 text-white rounded text-sm font-semibold transition ${
-                selectedUser?.sex === "Male"
-                  ? "bg-blue-600 hover:bg-blue-700"
-                  : selectedUser?.sex === "Female"
-                  ? "bg-pink-600 hover:bg-pink-700"
-                  : "bg-gray-400 cursor-not-allowed"
-              }`}
-            >
-              {loading
-                ? "Processing..."
-                : selectedUser
-                ? `Add ${
-                    selectedUser.sex === "Male" ? "Paternity" : "Maternity"
-                  } Leave`
-                : "Add Parent Leave"}
-            </button>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Logs Table */}
-      <div className="bg-white mt-8 shadow rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">Action Logs</h2>
-        {logs.length === 0 ? (
-          <p className="text-gray-500 text-sm">No recent actions logged.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm text-left">
-              <thead>
-                <tr className="bg-gray-100 text-gray-700">
-                  <th className="px-4 py-2 border">Action</th>
-                  <th className="px-4 py-2 border">Performed By</th>
-                  <th className="px-4 py-2 border">Timestamp</th>
+      {lastGrantTimestamp && (
+        <p className="text-sm text-gray-700 mb-4">
+          Last granted:{" "}
+          <span className="font-mono">
+            {new Date(lastGrantTimestamp).toLocaleString()}
+          </span>
+        </p>
+      )}
+
+      <div className="overflow-x-auto bg-white shadow-md rounded border">
+        <table className="min-w-full text-sm text-left text-gray-800">
+          <thead className="bg-gray-100 text-xs uppercase font-semibold">
+            <tr>
+              <th className="px-4 py-2">Employee</th>
+              <th className="px-4 py-2">Amount</th>
+              <th className="px-4 py-2">Performed By</th>
+              <th className="px-4 py-2">Timestamp</th>
+              <th className="px-4 py-2">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {logs.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-center py-6 text-gray-400">
+                  No Yearly Credit logs found.
+                </td>
+              </tr>
+            ) : (
+              logs.map((log) => (
+                <tr key={log._id} className="border-t">
+                  <td className="px-4 py-2">{log.user}</td>
+                  <td className="px-4 py-2">{log.amount}</td>
+                  <td className="px-4 py-2">{log.performedBy}</td>
+                  <td className="px-4 py-2">
+                    {new Date(log.timestamp).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-2">{log.description || "-"}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {logs.map((log) => (
-                  <tr key={log._id} className="border-t">
-                    <td className="px-4 py-2">{log.action}</td>
-                    <td className="px-4 py-2">{log.performedBy}</td>
-                    <td className="px-4 py-2">
-                      {new Date(log.timestamp).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

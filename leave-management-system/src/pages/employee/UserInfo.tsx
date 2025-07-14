@@ -22,7 +22,14 @@ const UserInfo = () => {
     const fetchLeaveCredits = async () => {
       try {
         const res = await axios.get(`${API}/users/${userId}`);
-        setLiveCredits(res.data.leaveCredits ?? 0);
+        const history = res.data.leaveCreditHistory || [];
+        const today = new Date();
+
+        const validCredits = history
+          .filter((entry: any) => new Date(entry.expiresOn) >= today)
+          .reduce((sum: number, entry: any) => sum + entry.amount, 0);
+
+        setLiveCredits(validCredits);
       } catch (err) {
         console.error("Failed to refresh leave credits", err);
       }

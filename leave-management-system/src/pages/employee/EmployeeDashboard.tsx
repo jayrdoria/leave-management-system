@@ -36,7 +36,6 @@ const EmployeeDashboard = () => {
 
       const ownLeaves = ownLeavesRes.data;
       const scopedLeaves = scopedLeavesRes.data;
-
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -60,7 +59,12 @@ const EmployeeDashboard = () => {
         );
       });
 
-      setLeaveCredits(userRes.data.leaveCredits || 0);
+      // ✅ Calculate valid leave credits from leaveCreditHistory
+      const validCredits = (userRes.data.leaveCreditHistory || [])
+        .filter((entry: any) => new Date(entry.expiresOn) >= today)
+        .reduce((sum: number, entry: any) => sum + entry.amount, 0);
+
+      setLeaveCredits(validCredits);
       setPendingLeaves(pending);
       setTotalLeaves(approvedThisYear.length);
       setUpcomingLeaves(upcoming.slice(0, 5));

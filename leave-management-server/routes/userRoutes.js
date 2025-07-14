@@ -60,6 +60,7 @@ router.post("/", async (req, res) => {
       leaveCredits,
       country,
       sex,
+      leaveCreditHistory,
     } = req.body;
 
     const existing = await User.findOne({ email });
@@ -74,7 +75,14 @@ router.post("/", async (req, res) => {
       role,
       department,
       departmentScope,
-      leaveCredits,
+      leaveCredits: 0, // deprecated
+      leaveCreditHistory: Array.isArray(leaveCreditHistory)
+        ? leaveCreditHistory.map((entry) => ({
+            amount: entry.amount,
+            expiresOn: new Date(entry.expiresOn),
+            dateAdded: new Date(),
+          }))
+        : [],
       country,
       sex,
     });
@@ -97,16 +105,29 @@ router.patch("/:id", async (req, res) => {
       "role",
       "department",
       "departmentScope",
-      "leaveCredits",
       "country",
       "sex",
+      "leaveCreditHistory", // ✅ support editing credits per year
     ];
+
     const updates = {};
 
     for (let key of allowedFields) {
       if (req.body[key] !== undefined) {
         updates[key] = req.body[key];
       }
+    }
+
+    // ✅ Normalize leaveCreditHistory if present
+    if (
+      updates.leaveCreditHistory &&
+      Array.isArray(updates.leaveCreditHistory)
+    ) {
+      updates.leaveCreditHistory = updates.leaveCreditHistory.map((entry) => ({
+        amount: entry.amount,
+        expiresOn: new Date(entry.expiresOn),
+        dateAdded: new Date(), // this marks the time of update
+      }));
     }
 
     if (req.body.passwordHash) {
@@ -144,23 +165,41 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// ✅ MANUAL CREDIT (NEW)
+// ✅ MANUAL CREDIT (UPDATED FOR leaveCreditHistory)
 router.post("/manual-credit", authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== "admin") {
       return res.status(403).json({ msg: "Unauthorized" });
     }
 
-    const { userId, amount, description } = req.body;
+    const { userId, amount, description, expiresOn } = req.body;
 
-    if (!userId || amount === undefined) {
+    if (!userId || amount === undefined || !expiresOn) {
       return res.status(400).json({ msg: "Missing required fields" });
     }
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ msg: "User not found" });
 
-    user.leaveCredits += Number(amount);
+    const amountNum = Number(amount);
+    const expiryDate = new Date(expiresOn);
+
+    // Find if expiry already exists
+    const existingEntry = user.leaveCreditHistory.find(
+      (entry) =>
+        new Date(entry.expiresOn).getFullYear() === expiryDate.getFullYear()
+    );
+
+    if (existingEntry) {
+      existingEntry.amount += amountNum;
+    } else {
+      user.leaveCreditHistory.push({
+        amount: amountNum,
+        expiresOn: expiryDate,
+        dateAdded: new Date(),
+      });
+    }
+
     await user.save();
 
     await LeaveActionLog.create({
@@ -168,112 +207,113 @@ router.post("/manual-credit", authMiddleware, async (req, res) => {
       performedBy: req.user.name,
       user: user.name,
       userId: user._id,
-      amount: Number(amount),
+      amount: amountNum,
       description: description || "",
       timestamp: new Date(),
     });
 
     res
       .status(200)
-      .json({ msg: `Added ${amount} leave credits to ${user.name}` });
+      .json({ msg: `Added ${amount} leave credit(s) to ${user.name}` });
   } catch (err) {
     console.error("Manual credit error:", err);
     res.status(500).json({ msg: "Failed to apply manual credit" });
   }
 });
 
-// ✅ RESET LEAVES
-router.post("/reset-leaves", authMiddleware, async (req, res) => {
+// ✅ ADD YEARLY CREDITS (PHASE 4)
+let latestYearlyCreditTimestamp = null;
+
+const getNextYearExpiry = () => {
+  const now = new Date();
+  const nextYear = now.getFullYear() + 1;
+  return new Date(`${nextYear}-12-31T23:59:59.000+08:00`);
+};
+
+router.post("/yearly-credits", authMiddleware, async (req, res) => {
   try {
     if (req.user.role !== "admin") {
       return res.status(403).json({ msg: "Unauthorized" });
     }
 
-    await User.updateMany({}, { $set: { leaveCredits: 0 } });
-
-    await LeaveActionLog.create({
-      action: "Reset Leaves",
-      performedBy: req.user.name,
-    });
-
-    res.json({ msg: "All leave credits reset to 0" });
-  } catch (err) {
-    console.error("Reset error:", err);
-    res.status(500).json({ msg: "Error resetting leave credits" });
-  }
-});
-
-// ✅ ADD STANDARD LEAVES
-router.post("/add-standard-leaves", authMiddleware, async (req, res) => {
-  try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ msg: "Unauthorized" });
-    }
+    const actionTimestamp = new Date();
+    latestYearlyCreditTimestamp = actionTimestamp;
 
     const users = await User.find();
 
-    const bulkOps = users.map((user) => {
-      const standard =
-        user.country === "PH" ? 15 : user.country === "Malta" ? 24 : 0;
-      return {
-        updateOne: {
-          filter: { _id: user._id },
-          update: { $inc: { leaveCredits: standard } },
-        },
-      };
+    for (const user of users) {
+      const amount = user.country === "PH" ? 15 : 24;
+
+      // Push into leaveCreditHistory
+      user.leaveCreditHistory.push({
+        amount,
+        dateAdded: actionTimestamp,
+        expiresOn: getNextYearExpiry(),
+      });
+
+      await user.save();
+
+      // Log to leaveActionLogs
+      await LeaveActionLog.create({
+        action: "Yearly Credit",
+        performedBy: req.user.name,
+        user: user.name,
+        userId: user._id,
+        amount,
+        description: `Yearly credit added (${amount}) for ${user.country}`,
+        timestamp: actionTimestamp,
+      });
+    }
+
+    res.status(200).json({
+      msg: "Yearly leave credits granted to all users.",
+      timestamp: actionTimestamp,
     });
-
-    await User.bulkWrite(bulkOps);
-
-    await LeaveActionLog.create({
-      action: "Add Standard Leaves",
-      performedBy: req.user.name,
-    });
-
-    res.json({ msg: "Standard leave credits added based on country" });
   } catch (err) {
-    console.error("Add standard leave error:", err);
-    res.status(500).json({ msg: "Error adding standard leave credits" });
+    console.error("Yearly Credit Error:", err);
+    res.status(500).json({ msg: "Failed to apply yearly credits" });
   }
 });
 
-// POST /api/users/add-parent-leave
-router.post("/add-parent-leave", authMiddleware, async (req, res) => {
+// ✅ RESET YEARLY CREDITS (Undo within 24h)
+router.post("/reset-yearly-credits", authMiddleware, async (req, res) => {
   try {
-    const { userId } = req.body;
-    const admin = req.user;
-
-    if (admin.role !== "admin") {
+    if (req.user.role !== "admin") {
       return res.status(403).json({ msg: "Unauthorized" });
     }
 
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ msg: "User not found" });
-
-    const creditsToAdd =
-      user.sex === "Male" ? 10 : user.sex === "Female" ? 45 : 0;
-
-    if (creditsToAdd === 0) {
-      return res
-        .status(400)
-        .json({ msg: "User sex not defined for parent leave." });
+    const { timestamp } = req.body;
+    if (!timestamp) {
+      return res.status(400).json({ msg: "Timestamp is required" });
     }
 
-    user.leaveCredits += creditsToAdd;
-    await user.save();
+    const parsedTimestamp = new Date(timestamp);
 
-    await LeaveActionLog.create({
-      action: `Added ${creditsToAdd} ${
-        user.sex === "Male" ? "Paternity" : "Maternity"
-      } Leave credits to ${user.name}`,
-      performedBy: admin.name,
-      timestamp: new Date(),
+    const users = await User.find();
+
+    for (const user of users) {
+      // Filter out the matching yearly credit entry
+      const originalLength = user.leaveCreditHistory.length;
+      user.leaveCreditHistory = user.leaveCreditHistory.filter(
+        (entry) =>
+          new Date(entry.dateAdded).getTime() !== parsedTimestamp.getTime()
+      );
+
+      if (user.leaveCreditHistory.length !== originalLength) {
+        await user.save();
+      }
+    }
+
+    // Optionally delete the logs for this timestamp
+    await LeaveActionLog.deleteMany({
+      action: "Yearly Credit",
+      timestamp: parsedTimestamp,
     });
 
-    res.status(200).json({ msg: "Parent leave credits added." });
+    res.status(200).json({ msg: "Yearly credits reset successfully" });
   } catch (err) {
-    console.error("Parent leave add error:", err);
-    res.status(500).json({ msg: "Server error while adding parent leave." });
+    console.error("Reset error:", err);
+    res.status(500).json({ msg: "Reset failed" });
   }
 });
 

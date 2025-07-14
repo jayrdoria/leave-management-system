@@ -56,15 +56,19 @@ const ManagerDashboard = () => {
         (l: LeaveEntry) => l.userId?._id === user._id && l.status === "Pending"
       );
 
-      const history = userRes.data.leaveCreditHistory || [];
-      const usableCredits = history
-        .filter((entry: any) => new Date(entry.expiresOn) >= today)
-        .reduce((sum: number, entry: any) => sum + entry.amount, 0);
+      const calculateValidCredits = (history: any[]) => {
+        const now = new Date();
+        return history
+          .filter((entry) => new Date(entry.expiresOn) >= now)
+          .reduce((sum, entry) => sum + entry.amount, 0);
+      };
 
       setUpcomingLeaves(upcoming.slice(0, 5));
       setPendingLeaves(pending);
       setTotalLeaves(ownLeaves.length);
-      setLeaveCredits(parseFloat(usableCredits.toFixed(2)));
+      setLeaveCredits(
+        calculateValidCredits(userRes.data.leaveCreditHistory || [])
+      );
     } catch (err) {
       console.error("Manager dashboard failed to load", err);
     }

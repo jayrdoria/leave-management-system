@@ -78,10 +78,15 @@ const AdminDashboard = () => {
           new Date(l.startDate).getFullYear() === today.getFullYear()
       );
 
+      // ✅ Phase 5: Calculate valid (non-expired) credits from leaveCreditHistory
+      const validCredits = (userSelfRes.data.leaveCreditHistory || [])
+        .filter((entry: any) => new Date(entry.expiresOn) >= today)
+        .reduce((sum: number, entry: any) => sum + entry.amount, 0);
+
       setUpcomingLeaves(upcoming.slice(0, 5));
       setPendingLeaves(pending);
       setTotalLeaves(approvedThisYear.length);
-      setLeaveCredits(userSelfRes.data.leaveCredits || 0);
+      setLeaveCredits(validCredits);
 
       const approvedLeaves = allCompanyLeaves.filter(
         (l) => l.status === "Approved"

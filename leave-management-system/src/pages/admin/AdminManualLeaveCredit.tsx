@@ -10,10 +10,13 @@ const AdminManualLeaveCredit = () => {
   const [formData, setFormData] = useState({
     userId: "",
     amount: "",
+    expires: "thisYear",
     description: "",
   });
   const [loading, setLoading] = useState(false);
-  const [feedback, setFeedback] = useState("");
+
+  const currentYear = new Date().getFullYear();
+  const nextYear = currentYear + 1;
 
   const fetchUsers = async () => {
     const res = await axios.get(`${API}/users`);
@@ -42,11 +45,17 @@ const AdminManualLeaveCredit = () => {
     e.preventDefault();
     setLoading(true);
     try {
+      const expiryYear =
+        formData.expires === "thisYear" ? currentYear : nextYear;
+      const expiresOn = `${expiryYear}-12-31T00:00:00.000Z`;
+
       const res = await axios.post(
         `${API}/users/manual-credit`,
         {
-          ...formData,
+          userId: formData.userId,
           amount: Number(formData.amount),
+          expiresOn,
+          description: formData.description,
         },
         {
           headers: {
@@ -55,8 +64,13 @@ const AdminManualLeaveCredit = () => {
         }
       );
 
-      toast.success(res.data.msg); // ✅ Show toast only
-      setFormData({ userId: "", amount: "", description: "" });
+      toast.success(res.data.msg);
+      setFormData({
+        userId: "",
+        amount: "",
+        expires: "thisYear",
+        description: "",
+      });
       fetchLogs();
     } catch (err: any) {
       toast.error(err?.response?.data?.msg || "Something went wrong");
@@ -91,18 +105,34 @@ const AdminManualLeaveCredit = () => {
           </select>
         </div>
 
-        <div>
-          <label className="block font-medium mb-1">Amount to Add</label>
-          <input
-            type="number"
-            name="amount"
-            value={formData.amount}
-            onChange={handleChange}
-            required
-            className="w-full border px-3 py-2 rounded"
-            min={0.5}
-            step={0.5}
-          />
+        <div className="grid md:grid-cols-2 gap-4">
+          <div>
+            <label className="block font-medium mb-1">Amount to Add</label>
+            <input
+              type="number"
+              name="amount"
+              value={formData.amount}
+              onChange={handleChange}
+              required
+              className="w-full border px-3 py-2 rounded"
+              min={0.5}
+              step={0.5}
+            />
+          </div>
+
+          <div>
+            <label className="block font-medium mb-1">Expiry Year</label>
+            <select
+              name="expires"
+              value={formData.expires}
+              onChange={handleChange}
+              required
+              className="w-full border px-3 py-2 rounded"
+            >
+              <option value="thisYear">Expire: Dec 31, {currentYear}</option>
+              <option value="nextYear">Expire: Dec 31, {nextYear}</option>
+            </select>
+          </div>
         </div>
 
         <div>

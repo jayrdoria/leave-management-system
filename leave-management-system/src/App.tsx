@@ -17,6 +17,7 @@ import AdminManageLeaves from "./pages/admin/AdminManageLeaves";
 import AdminApplyLeave from "./pages/admin/AdminApplyLeave";
 import AdminLeaveControl from "./pages/admin/AdminLeaveControl";
 import AdminManualLeaveCredit from "./pages/admin/AdminManualLeaveCredit";
+import AdminLeaveCreditUsage from "./pages/admin/AdminLeaveCreditUsage";
 
 function App() {
   return (
@@ -36,6 +37,11 @@ function App() {
             <Route path="profile" element={<UserInfo />} />
             <Route path="user-management" element={<AdminUserManagement />} />
             <Route path="apply-leave" element={<AdminApplyLeave />} />
+            <Route path="admin-leave-control" element={<AdminLeaveControl />} />
+            <Route
+              path="leave-credit-usage"
+              element={<AdminLeaveCreditUsage />}
+            />
             <Route
               path="manual-leave-credit"
               element={<AdminManualLeaveCredit />}
