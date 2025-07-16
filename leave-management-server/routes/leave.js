@@ -47,6 +47,24 @@ router.post("/apply", async (req, res) => {
       }
     }
 
+    // Check if user already has leave filed during the requested dates
+    const existingLeave = await Leave.findOne({
+      userId,
+      status: { $in: ["Pending", "Approved"] }, // Ignore Rejected or Cancelled
+      $or: [
+        {
+          startDate: { $lte: new Date(endDate) },
+          endDate: { $gte: new Date(startDate) },
+        },
+      ],
+    });
+
+    if (existingLeave) {
+      return res.status(400).json({
+        msg: `You already have a ${existingLeave.status.toLowerCase()} leave filed that overlaps with these dates.`,
+      });
+    }
+
     const newLeave = new Leave({
       userId,
       category,
@@ -637,6 +655,24 @@ router.post("/admin-apply", authMiddleware, async (req, res) => {
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ msg: "User not found" });
+
+    // 🚫 Overlap check
+    const existingLeave = await Leave.findOne({
+      userId,
+      status: { $in: ["Pending", "Approved"] },
+      $or: [
+        {
+          startDate: { $lte: new Date(endDate) },
+          endDate: { $gte: new Date(startDate) },
+        },
+      ],
+    });
+
+    if (existingLeave) {
+      return res.status(400).json({
+        msg: `This user already has a ${existingLeave.status.toLowerCase()} leave filed that overlaps with these dates.`,
+      });
+    }
 
     const start = new Date(startDate);
     const end = new Date(endDate);
