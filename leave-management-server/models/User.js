@@ -39,7 +39,7 @@ const userSchema = new mongoose.Schema(
 
     country: {
       type: String,
-      enum: ["PH", "Malta"],
+      enum: ["PH", "Malta", "Others"],
       required: true,
       default: "PH",
     },

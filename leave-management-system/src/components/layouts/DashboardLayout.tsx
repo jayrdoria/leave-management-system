@@ -51,7 +51,15 @@ const DashboardLayout = ({ role }: Props) => {
       <aside className="w-64 bg-white border-r flex flex-col shadow-sm">
         {/* Header */}
         <div className="p-6 border-b">
-          <h1 className="text-xl font-bold text-blue-600">🌿 Leave System</h1>
+          <div className="flex items-center space-x-2">
+            <img
+              src="https://avatars.slack-edge.com/2023-01-27/4733489633024_675bb343be96883ef7b2_88.png"
+              alt="Logo"
+              className="w-8 h-8 rounded-full"
+            />
+            <h1 className="text-xl font-bold">Leave System</h1>
+          </div>
+
           <div className="mt-3 text-sm text-gray-700">
             <p className="font-semibold truncate">{user.name}</p>
             {user.department && (

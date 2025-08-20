@@ -22,9 +22,12 @@ const DEPARTMENTS = [
   "Acquisition",
   "Marketing (CRM & Creative team)",
   "Operations & Analytics",
+  "CEO",
+  "Data Analyst",
+  "Creatives",
 ];
 
-const COUNTRIES = ["PH", "Malta"];
+const COUNTRIES = ["PH", "Malta", "Others"];
 
 const AdminUserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);

@@ -242,7 +242,16 @@ router.post("/yearly-credits", authMiddleware, async (req, res) => {
     const users = await User.find();
 
     for (const user of users) {
-      const amount = user.country === "PH" ? 15 : 24;
+      let amount = null;
+
+      if (user.country === "PH") {
+        amount = 15;
+      } else if (user.country === "Malta") {
+        amount = 24;
+      } else {
+        // Skip Others or unsupported countries
+        continue;
+      }
 
       // Push into leaveCreditHistory
       user.leaveCreditHistory.push({
@@ -315,6 +324,24 @@ router.post("/reset-yearly-credits", authMiddleware, async (req, res) => {
     console.error("Reset error:", err);
     res.status(500).json({ msg: "Reset failed" });
   }
+});
+
+// PUT /api/users/change-password
+router.put("/change-password", authMiddleware, async (req, res) => {
+  const { userId, currentPassword, newPassword } = req.body;
+
+  const user = await User.findById(userId);
+  if (!user) return res.status(404).json({ msg: "User not found" });
+
+  const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!isMatch)
+    return res.status(401).json({ msg: "Current password is incorrect" });
+
+  const newHash = await bcrypt.hash(newPassword, 10);
+  user.passwordHash = newHash;
+  await user.save();
+
+  res.json({ msg: "Password updated successfully" });
 });
 
 module.exports = router;
