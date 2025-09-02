@@ -231,14 +231,24 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
       return res.status(403).json({ msg: "Access denied. Not a manager." });
     }
 
+    // get manager's dept + departmentScope
+    const mgr = await User.findById(req.user._id).select(
+      "department departmentScope"
+    );
+    if (!mgr) return res.status(404).json({ msg: "Manager user not found." });
+
+    const scope = mgr.departmentScope?.length
+      ? new Set([mgr.department, ...mgr.departmentScope])
+      : new Set([mgr.department]);
+
     const leave = await Leave.findById(leaveId);
     if (!leave) return res.status(404).json({ msg: "Leave not found." });
 
-    // Allow managers to approve their own leaves
-    if (
-      leave.department !== req.user.department &&
-      leave.userId.toString() !== req.user.id
-    ) {
+    const isOwnLeave =
+      leave.userId?.toString?.() === req.user._id?.toString?.();
+    const inScope = scope.has(leave.department);
+
+    if (!isOwnLeave && !inScope) {
       return res
         .status(403)
         .json({ msg: "Not authorized for this department." });
@@ -279,7 +289,7 @@ router.put("/manager/leave/:id", authMiddleware, async (req, res) => {
     else if (["Approved", "Rejected"].includes(status)) {
       leave.status = status;
       leave.comment = comment || "";
-      leave.approverId = req.user.id;
+      leave.approverId = req.user._id;
 
       if (status === "Approved" && leave.deductCredits) {
         try {

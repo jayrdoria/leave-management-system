@@ -20,7 +20,7 @@ const DEPARTMENTS = [
   "VIP",
   "CS",
   "Acquisition",
-  "Marketing (CRM & Creative team)",
+  "Marketing",
   "Operations & Analytics",
   "CEO",
   "Data Analyst",
